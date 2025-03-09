@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>E-COMMERCE Expense Tracker & Budgeting</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="logo">
+        <h1>E-COMMERCE Expense Tracker & Budgeting</h1>
+      </div>
+
+      <div class="section budgeting">
+        <h2><i class="fas fa-piggy-bank icon"></i> Household Budgeting</h2>
+        <form id="budgetForm">
+          <div class="form-group">
+            <label for="budgetFrequency"
+              ><i class="fas fa-clock icon"></i> Budget Frequency:</label
+            >
+            <select id="budgetFrequency" name="budgetFrequency">
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="income"
+              ><i class="fas fa-money-bill-wave icon"></i> Monthly
+              Income:</label
+            >
+            <input
+              type="number"
+              id="income"
+              name="income"
+              step="0.01"
+              placeholder="e.g., 3000.00"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="budgetCategory"
+              ><i class="fas fa-folder icon"></i> Budget Category:</label
+            >
+            <select id="budgetCategory" name="budgetCategory">
+              <option value="Food">Food</option>
+              <option value="Rent">Rent</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Savings">Savings</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="budgetAmount"
+              ><i class="fas fa-coins icon"></i> Budgeted Amount:</label
+            >
+            <input
+              type="number"
+              id="budgetAmount"
+              name="budgetAmount"
+              step="0.01"
+              placeholder="e.g., 500.00"
+              required
+            />
+          </div>
+
+          <button type="button" class="btn btn-primary" id="addBudgetBtn">
+            <i class="fas fa-plus icon"></i> Add Budget
+          </button>
+        </form>
+
+        <h3><i class="fas fa-clipboard-list icon"></i> Budget List</h3>
+        <ul class="list-group" id="budgetList"></ul>
+      </div>
+      <div class="section expense-tracker">
+        <h2><i class="fas fa-chart-line icon"></i> Expense Tracker</h2>
+        <form id="expenseForm">
+          <div class="form-group">
+            <label for="expenseDate"
+              ><i class="fas fa-calendar-alt icon"></i> Date:</label
+            >
+            <input type="date" id="expenseDate" name="expenseDate" required />
+          </div>
+
+          <div class="form-group">
+            <label for="expenseDescription"
+              ><i class="fas fa-pen icon"></i> Description:</label
+            >
+            <input
+              type="text"
+              id="expenseDescription"
+              name="expenseDescription"
+              placeholder="e.g., Coffee with friends"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="expenseCategory"
+              ><i class="fas fa-list icon"></i> Category:</label
+            >
+            <select id="expenseCategory" name="expenseCategory">
+              <option value="Food">Food</option>
+              <option value="Rent">Rent</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="expenseAmount"
+              ><i class="fas fa-dollar-sign icon"></i> Amount:</label
+            >
+            <input
+              type="number"
+              id="expenseAmount"
+              name="expenseAmount"
+              step="0.01"
+              placeholder="e.g., 25.50"
+              required
+            />
+          </div>
+
+          <button type="button" class="btn btn-primary" id="addExpenseBtn">
+            <i class="fas fa-plus icon"></i> Add Expense
+          </button>
+        </form>
+
+        <h3><i class="fas fa-list-ul icon"></i> Expense List</h3>
+        <ul class="list-group" id="expenseList"></ul>
+      </div>
+
+      <div class="section dashboard">
+        <h2><i class="fas fa-chart-bar icon"></i> Expense Charts</h2>
+        <div class="charts-container">
+          <div class="chart-wrapper">
+            <canvas id="expenseChart"></canvas>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="expensePieChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="totals">
+        <h2><i class="fas fa-calculator icon"></i> Summary</h2>
+        <p>Total Expenses: $<span id="totalExpenses">0.00</span></p>
+        <p>Total Budgeted: $<span id="totalBudgeted">0.00</span></p>
+        <p>Remaining Budget: $<span id="remainingBudget">0.00</span></p>
+      </div>
+    </div>
+
+    <script src="index.js"></script>
+  </body>
+</html>
