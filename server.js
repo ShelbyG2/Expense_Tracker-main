@@ -2,10 +2,11 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mysql = require("mysql");
-const bcrypt = require("bcrypt"); // Add bcrypt package
+const bcrypt = require("bcrypt");
+require("dotenv").config(); // Add dotenv package
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000; // Use environment variable for port
 
 // Middleware to parse form data
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -36,10 +37,10 @@ app.post("/signin", (req, res) => {
 // Function to authenticate user
 function authenticateUser(username, password, res) {
   const connection = mysql.createConnection({
-    host: "localhost",
-    user: "shelby",
-    password: "database",
-    database: "Expense_Tracker",
+    host: process.env.DB_HOST, // Use environment variables for database connection
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
   });
 
   connection.connect((err) => {
@@ -82,10 +83,10 @@ function authenticateUser(username, password, res) {
 // Function to insert user data into the database
 function insertUserData(username, email, password, res) {
   const connection = mysql.createConnection({
-    host: "localhost",
-    user: "shelby",
-    password: "database",
-    database: "Expense_Tracker",
+    host: process.env.DB_HOST, // Use environment variables for database connection
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
   });
 
   connection.connect((err) => {
