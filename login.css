@@ -102,6 +102,10 @@ form.sign-in-form {
   font-weight: 500;
 }
 
+.input-field:hover {
+  background-color: #e0e0e0;
+}
+
 .social-text {
   padding: 0.7rem 0;
   font-size: 1rem;
@@ -149,11 +153,14 @@ form.sign-in-form {
   margin: 10px 0;
   cursor: pointer;
   transition: 0.5s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn:hover {
   background-color: #4d84e2;
+  transform: translateY(-2px);
 }
+
 .panels-container {
   position: absolute;
   height: 100%;
@@ -401,4 +408,38 @@ form.sign-in-form {
     bottom: 28%;
     left: 50%;
   }
+}
+
+.notification {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+
+  padding: 15px;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 16px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
+}
+
+/* Style for success notifications */
+.notification.success {
+  background-color: #4caf50; /* Green */
+}
+
+/* Style for error notifications */
+.notification.error {
+  background-color: #f44336; /* Red */
+}
+
+/* Style for warning notifications */
+.notification.warning {
+  background-color: #ff9800; /* Orange */
+}
+
+.notification.info {
+  background-color: #2196f3;
 }

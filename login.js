@@ -15,8 +15,8 @@ const signUpForm = document.querySelector(".sign-up-form");
 
 signInForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const username = signInForm.querySelector("input[type='text']").value;
-  const password = signInForm.querySelector("input[type='password']").value;
+  const username = signInForm.querySelector("input[name='username']").value;
+  const password = signInForm.querySelector("input[name='password']").value;
   console.log("Sign-in form submitted:", { username, password }); // Log form data
   if (username === "" || password === "") {
     showNotification("Please fill in all fields", "error");
@@ -45,9 +45,9 @@ signInForm.addEventListener("submit", async (e) => {
 
 signUpForm.addEventListener("submit", (e) => {
   e.preventDefault();
-  const username = signUpForm.querySelector("input[type='text']").value;
-  const email = signUpForm.querySelector("input[type='email']").value;
-  const password = signUpForm.querySelector("input[type='password']").value;
+  const username = signUpForm.querySelector("input[name='username']").value;
+  const email = signUpForm.querySelector("input[name='email']").value;
+  const password = signUpForm.querySelector("input[name='password']").value;
   if (username === "" || email === "" || password === "") {
     showNotification("Please fill in all fields", "error");
   } else if (!validateEmail(email)) {
@@ -76,4 +76,14 @@ async function submitSignUpForm(username, email, password) {
   } catch (error) {
     console.error("Error:", error);
   }
+}
+
+function showNotification(message, type) {
+  const notification = document.createElement("div");
+  notification.className = `notification ${type}`;
+  notification.innerHTML = `<i class="fas fa-bell"></i> ${message}`;
+  document.body.appendChild(notification);
+  setTimeout(() => {
+    notification.remove();
+  }, 3000);
 }

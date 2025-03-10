@@ -1,7 +1,29 @@
 {
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "body-parser": "^1.20.3",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
     "mysql": "^2.18.1"
-  }
+  },
+  "name": "expense_tracker-main",
+  "version": "1.0.0",
+  "description": "The Expense Tracker is a simple application to track your daily expenses. It allows you to add, view, and delete expenses, and provides a summary of your spending.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShelbyG2/Expense_Tracker-main.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ShelbyG2/Expense_Tracker-main/issues"
+  },
+  "homepage": "https://github.com/ShelbyG2/Expense_Tracker-main#readme"
 }
