@@ -17,29 +17,35 @@ signInForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const username = signInForm.querySelector("input[name='username']").value;
   const password = signInForm.querySelector("input[name='password']").value;
-  console.log("Sign-in form submitted:", { username, password }); // Log form data
+
   if (username === "" || password === "") {
     showNotification("Please fill in all fields", "error");
-  } else {
-    try {
-      const response = await fetch("/signin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await response.text();
-      console.log("Sign-in response:", data); // Log response data
-      if (response.ok) {
-        showNotification(data, "success");
-        window.location.href = "./homepage.html";
-      } else {
-        showNotification(data, "error");
-      }
-    } catch (error) {
-      console.error("Error:", error);
+    return;
+  }
+
+  try {
+    const response = await fetch("/signin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Store the JWT token in localStorage
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userId", data.userId);
+      showNotification("Login successful", "success");
+      window.location.href = "./homepage.html";
+    } else {
+      showNotification(data.message || "Login failed", "error");
     }
+  } catch (error) {
+    console.error("Error:", error);
+    showNotification("An error occurred during login", "error");
   }
 });
 
@@ -72,6 +78,7 @@ async function submitSignUpForm(username, email, password) {
       body: JSON.stringify({ username, email, password }),
     });
     const data = await response.text();
+    container.classList.remove("sign-up-mode");
     showNotification(data, "success");
   } catch (error) {
     console.error("Error:", error);

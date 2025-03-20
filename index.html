@@ -1,0 +1,62 @@
+<!-- Budget Section -->
+<div class="budget-section">
+  <h2>Budget Management</h2>
+
+  <!-- Budget Form -->
+  <div class="budget-form">
+    <h3>Add New Budget</h3>
+    <form id="budgetForm">
+      <div class="form-group">
+        <label for="budgetFrequency">Frequency</label>
+        <select id="budgetFrequency" required>
+          <option value="">Select Frequency</option>
+          <option value="Monthly">Monthly</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Yearly">Yearly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="budgetCategory">Budget Category</label>
+        <input
+          type="text"
+          id="budgetCategory"
+          required
+          placeholder="e.g., Groceries, Rent, Utilities"
+        />
+      </div>
+      <div class="form-group">
+        <label for="budgetAmount">Budget Amount</label>
+        <input
+          type="number"
+          id="budgetAmount"
+          step="0.01"
+          required
+          placeholder="Enter amount"
+        />
+      </div>
+      <button type="submit">Add Budget</button>
+    </form>
+  </div>
+
+  <!-- Budget Summary -->
+  <div class="budget-summary">
+    <div class="summary-item">
+      <h4>Total Budgeted</h4>
+      <div class="amount" id="totalBudgeted">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <h4>Total Expenses</h4>
+      <div class="amount" id="totalExpenses">$0.00</div>
+    </div>
+    <div class="summary-item">
+      <h4>Remaining Budget</h4>
+      <div class="amount" id="remainingBudget">$0.00</div>
+    </div>
+  </div>
+
+  <!-- Budget List -->
+  <div class="budget-list">
+    <h3>Your Budgets</h3>
+    <ul id="budgetList"></ul>
+  </div>
+</div>
