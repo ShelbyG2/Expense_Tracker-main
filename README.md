@@ -21,18 +21,18 @@ Expense_Tracker/
 │       └── reminder.html   # Reminder page
 ├── server/                 # Server-side code
 │   ├── config/            # Configuration files
-│   │   └── .env          # Environment variables
-│   ├── routes/           # API routes
-│   │   ├── auth.js       # Authentication routes
-│   │   ├── budgets.js    # Budget management routes
-│   │   ├── expenses.js   # Expense management routes
-│   │   └── income.js     # Income management routes
-│   ├── models/           # Database models
-│   │   ├── User.js       # User model
-│   │   ├── Budget.js     # Budget model
-│   │   ├── Expense.js    # Expense model
-│   │   └── Income.js     # Income model
-│   └── server.js         # Main server file
+│   │   └── .env           # Environment variables
+│   ├── routes/            # API routes
+│   │   ├── auth.js        # Authentication routes
+│   │   ├── budgets.js     # Budget management routes
+│   │   ├── expenses.js    # Expense management routes
+│   │   └── income.js      # Income management routes
+│   ├── models/            # Database models
+│   │   ├── User.js        # User model
+│   │   ├── Budget.js      # Budget model
+│   │   ├── Expense.js     # Expense model
+│   │   └── Income.js      # Income model
+│   └── server.js          # Main server file
 ```
 
 ## Features
