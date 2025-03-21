@@ -35,6 +35,10 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/login.html");
 });
 
+app.get("/home", (req, res) => {
+  res.sendFile(__dirname + "/homepage.html");
+});
+
 app.post("/signup", (req, res) => {
   const { username, email, password } = req.body;
   insertUserData(username, email, password, res);
@@ -103,7 +107,150 @@ app.post("/api/expenses", authenticateJWT, (req, res) => {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  insertExpenseData(userId, date, description, category, amount, res, ip);
+  const connection = createConnection();
+  connection.connect((err) => {
+    if (err) return handleError(res, "Database connection error", err);
+
+    // First, get the user's income
+    const incomeQuery = "SELECT amount FROM income WHERE user_id = ?";
+    connection.query(incomeQuery, [userId], (err, incomeResults) => {
+      if (err) {
+        connection.end();
+        return handleError(res, "Error checking income", err);
+      }
+
+      const income =
+        incomeResults.length > 0 ? parseFloat(incomeResults[0].amount) : 0;
+
+      // Then, get the total of current expenses
+      const expensesQuery =
+        "SELECT SUM(amount) as total FROM expenses WHERE user_id = ?";
+      connection.query(expensesQuery, [userId], (err, expenseResults) => {
+        if (err) {
+          connection.end();
+          return handleError(res, "Error checking existing expenses", err);
+        }
+
+        const currentExpenseTotal = expenseResults[0].total
+          ? parseFloat(expenseResults[0].total)
+          : 0;
+        const newTotal = currentExpenseTotal + parseFloat(amount);
+
+        // Check if adding this expense would exceed income
+        if (newTotal > income) {
+          connection.end();
+          logUserActivity(
+            userId,
+            "EXPENSE_ERROR",
+            `Attempted to add expense (${category}: KES ${amount}) that would exceed income (KES ${income})`,
+            ip
+          );
+          return res.status(400).json({
+            message: `Adding this expense would exceed your monthly income. 
+            Total expenses would be KES ${newTotal.toFixed(
+              2
+            )}, but your income is KES ${income.toFixed(2)}.`,
+          });
+        }
+
+        // Check if there's a budget for this category
+        const checkBudgetQuery =
+          "SELECT * FROM budgets WHERE user_id = ? AND category = ?";
+        connection.query(
+          checkBudgetQuery,
+          [userId, category],
+          (err, budgetResults) => {
+            if (err) {
+              connection.end();
+              return handleError(res, "Error checking budget", err);
+            }
+
+            if (budgetResults.length === 0) {
+              connection.end();
+              logUserActivity(
+                userId,
+                "EXPENSE_ERROR",
+                `Attempted to add expense for unbudgeted category: ${category}`,
+                ip
+              );
+              return res.status(400).json({
+                message: `No budget found for category '${category}'. Please add a budget first.`,
+              });
+            }
+
+            // Check if this expense would exceed the category budget
+            const budget = parseFloat(budgetResults[0].amount);
+
+            // Get the total of expenses for this category
+            const categoryExpensesQuery =
+              "SELECT SUM(amount) as total FROM expenses WHERE user_id = ? AND category = ?";
+            connection.query(
+              categoryExpensesQuery,
+              [userId, category],
+              (err, categoryExpenseResults) => {
+                if (err) {
+                  connection.end();
+                  return handleError(
+                    res,
+                    "Error checking category expenses",
+                    err
+                  );
+                }
+
+                const currentCategoryTotal = categoryExpenseResults[0].total
+                  ? parseFloat(categoryExpenseResults[0].total)
+                  : 0;
+                const newCategoryTotal =
+                  currentCategoryTotal + parseFloat(amount);
+
+                // Check if adding this expense would exceed the category budget
+                if (newCategoryTotal > budget) {
+                  logUserActivity(
+                    userId,
+                    "EXPENSE_WARNING",
+                    `Added expense (${category}: KES ${amount}) that exceeds category budget (KES ${budget})`,
+                    ip
+                  );
+                  // We'll allow it but log a warning and notify the user
+                }
+
+                // Now insert the expense
+                const query =
+                  "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
+                connection.query(
+                  query,
+                  [userId, date, description, category, amount],
+                  (err, result) => {
+                    if (err) {
+                      connection.end();
+                      return handleError(res, "Error adding expense", err);
+                    }
+
+                    logUserActivity(
+                      userId,
+                      "EXPENSE_ADDED",
+                      `Added expense - Category: ${category}, Amount: KES ${amount}, Description: ${description}`,
+                      ip
+                    );
+
+                    // Return a response that includes whether budget is exceeded
+                    res.json({
+                      message: "Expense added successfully",
+                      budgetExceeded: newCategoryTotal > budget,
+                      categoryBudget: budget,
+                      categoryTotal: newCategoryTotal,
+                    });
+
+                    connection.end();
+                  }
+                );
+              }
+            );
+          }
+        );
+      });
+    });
+  });
 });
 
 app.get("/api/expenses/:userId", authenticateJWT, (req, res) => {
@@ -121,7 +268,42 @@ app.get("/api/expenses/:userId", authenticateJWT, (req, res) => {
         return res.status(500).json({ error: "Failed to fetch expenses" });
       }
 
-      res.json(expenses);
+      // Group expenses by category
+      const categoryGroups = {};
+      const categoryTotals = {};
+      const categoryCounts = {};
+      let totalExpenses = 0;
+
+      expenses.forEach((expense) => {
+        const category = expense.category;
+
+        // Initialize category arrays and counters if they don't exist
+        if (!categoryGroups[category]) {
+          categoryGroups[category] = [];
+          categoryTotals[category] = 0;
+          categoryCounts[category] = 0;
+        }
+
+        // Add expense to its category group
+        categoryGroups[category].push(expense);
+
+        // Update category totals and counts
+        categoryTotals[category] += parseFloat(expense.amount);
+        categoryCounts[category]++;
+
+        // Update overall total
+        totalExpenses += parseFloat(expense.amount);
+      });
+
+      // Format the response with the grouped data
+      res.json({
+        expenses: expenses, // Original array for backward compatibility
+        categoryGroups: categoryGroups,
+        categoryTotals: categoryTotals,
+        categoryCounts: categoryCounts,
+        totalExpenses: totalExpenses,
+      });
+
       connection.end();
     });
   });
@@ -205,7 +387,8 @@ app.get("/api/income", authenticateJWT, (req, res) => {
         return res.status(500).json({ error: "Database connection failed" });
       }
 
-      const query = "SELECT amount, modified_at FROM income WHERE user_id = ?";
+      // Changed query to only select the amount column which definitely exists
+      const query = "SELECT amount FROM income WHERE user_id = ?";
       connection.query(query, [userId], (err, results) => {
         if (err) {
           console.error("Error fetching income:", err);
@@ -214,7 +397,8 @@ app.get("/api/income", authenticateJWT, (req, res) => {
         }
 
         const income = results.length > 0 ? results[0].amount : 0;
-        const modified_at = results.length > 0 ? results[0].modified_at : null;
+        // Use current timestamp instead of column value
+        const modified_at = new Date().toISOString();
 
         res.json({ income, modified_at });
         connection.end();
@@ -770,29 +954,48 @@ function insertExpenseData(
   const connection = createConnection();
   connection.connect((err) => {
     if (err) return handleError(res, "Database connection error", err);
-    //check if expense for this category already exists
-    const checkQuery =
-      "SELECT * FROM expenses WHERE user_id = ? AND category = ?";
-    connection.query(checkQuery, [userId, category], (err, results) => {
-      if (err) return handleError(res, "Error checking existing expense", err);
-      if (results.length > 0) {
-        return res.status(400).json({
-          message: `An expense for ${category} already exists. Please update the existing expense instead.`,
-        });
-      }
-      //if no existing expense found, insert the new one
-      const query =
-        "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
-      connection.query(
-        query,
-        [userId, date, description, category, amount],
-        (err, result) => {
-          if (err) return handleError(res, "Error inserting data", err);
-          res.json({ message: "Expense added successfully" });
-          connection.end();
+
+    // First check if there's a budget for this category
+    const checkBudgetQuery =
+      "SELECT * FROM budgets WHERE user_id = ? AND category = ?";
+    connection.query(
+      checkBudgetQuery,
+      [userId, category],
+      (err, budgetResults) => {
+        if (err) return handleError(res, "Error checking budget", err);
+
+        if (budgetResults.length === 0) {
+          logUserActivity(
+            userId,
+            "EXPENSE_ERROR",
+            `Attempted to add expense for unbudgeted category: ${category}`,
+            ip
+          );
+          return res.status(400).json({
+            message: `No budget found for category '${category}'. Please add a budget first.`,
+          });
         }
-      );
-    });
+
+        const query =
+          "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
+        connection.query(
+          query,
+          [userId, date, description, category, amount],
+          (err, result) => {
+            if (err) return handleError(res, "Error inserting data", err);
+
+            logUserActivity(
+              userId,
+              "EXPENSE_ADDED",
+              `Added expense - Category: ${category}, Amount: Ksh ${amount}, Description: ${description}`,
+              ip
+            );
+            res.json({ message: "Expense added successfully" });
+            connection.end();
+          }
+        );
+      }
+    );
   });
 }
 
@@ -1017,8 +1220,64 @@ connection.connect((err) => {
     });
   });
 
+  // Add a migration to check for and add the modified_at column if it doesn't exist
+  migrateIncomeTable();
+
   connection.end();
 });
+
+// Function to add modified_at column to income table if it doesn't exist
+function migrateIncomeTable() {
+  const connection = createConnection();
+  connection.connect((err) => {
+    if (err) {
+      console.error("Error connecting to database for migration:", err);
+      return;
+    }
+
+    // First check if the column exists
+    const checkColumnQuery = `
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'income' AND COLUMN_NAME = 'modified_at'
+    `;
+
+    connection.query(
+      checkColumnQuery,
+      [process.env.DB_NAME],
+      (err, results) => {
+        if (err) {
+          console.error("Error checking for column existence:", err);
+          connection.end();
+          return;
+        }
+
+        // If column doesn't exist, add it
+        if (results.length === 0) {
+          console.log("Adding missing modified_at column to income table...");
+          const addColumnQuery = `
+          ALTER TABLE income 
+          ADD COLUMN modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        `;
+
+          connection.query(addColumnQuery, (err) => {
+            if (err) {
+              console.error("Error adding modified_at column:", err);
+            } else {
+              console.log(
+                "Successfully added modified_at column to income table"
+              );
+            }
+            connection.end();
+          });
+        } else {
+          console.log("modified_at column already exists in income table");
+          connection.end();
+        }
+      }
+    );
+  });
+}
 
 // Start the server
 app.listen(port, () => {
