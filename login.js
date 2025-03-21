@@ -38,8 +38,9 @@ signInForm.addEventListener("submit", async (e) => {
       // Store the JWT token in localStorage
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", data.userId);
+      localStorage.setItem("userName", data.username);
       showNotification("Login successful", "success");
-      window.location.href = "./homepage.html";
+      window.location.href = "/home";
     } else {
       showNotification(data.message || "Login failed", "error");
     }

@@ -13,8 +13,9 @@
       referrerpolicy="no-referrer"
     />
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="auth.js" defer></script>
+    <script src="index.js" defer></script>
   </head>
   <body>
     <div class="dashboard-container">
@@ -118,12 +119,18 @@
             <div class="charts-container">
               <div class="row">
                 <div class="col-md-6">
-                  <div class="chart-container">
+                  <div
+                    class="chart-container"
+                    style="position: relative; height: 300px; width: 100%"
+                  >
                     <canvas id="expensePieChart"></canvas>
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <div class="chart-container">
+                  <div
+                    class="chart-container"
+                    style="position: relative; height: 300px; width: 100%"
+                  >
                     <canvas id="budgetVsExpenseChart"></canvas>
                   </div>
                 </div>
@@ -164,12 +171,18 @@
             </div>
             <div class="analytics-container">
               <div class="chart-wrapper">
-                <div class="chart-container">
+                <div
+                  class="chart-container"
+                  style="position: relative; height: 400px; width: 100%"
+                >
                   <canvas id="monthlyTrendChart"></canvas>
                 </div>
               </div>
               <div class="chart-wrapper">
-                <div class="chart-container">
+                <div
+                  class="chart-container"
+                  style="position: relative; height: 400px; width: 100%"
+                >
                   <canvas id="categoryComparisonChart"></canvas>
                 </div>
               </div>
@@ -357,7 +370,5 @@
         min-height: 450px; /* Minimum height for the chart */
       }
     </style>
-
-    <script src="index.js"></script>
   </body>
 </html>

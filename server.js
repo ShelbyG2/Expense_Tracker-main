@@ -35,6 +35,10 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/login.html");
 });
 
+app.get("/home", (req, res) => {
+  res.sendFile(__dirname + "/homepage.html");
+});
+
 app.post("/signup", (req, res) => {
   const { username, email, password } = req.body;
   insertUserData(username, email, password, res);
@@ -113,7 +117,16 @@ app.get("/api/expenses/:userId", authenticateJWT, (req, res) => {
   connection.connect((err) => {
     if (err) return handleError(res, "Database connection error", err);
 
-    const query = "SELECT * FROM expenses WHERE user_id = ? ORDER BY date DESC";
+    // Get all expenses with budget information
+    const query = `
+      SELECT 
+        e.*,
+        b.amount as budget_amount
+      FROM expenses e
+      LEFT JOIN budgets b ON e.category = b.category AND e.user_id = b.user_id
+      WHERE e.user_id = ? 
+      ORDER BY e.category, e.date DESC, e.id DESC`;
+
     connection.query(query, [userId], (err, expenses) => {
       if (err) {
         console.error("Error fetching expenses:", err);
@@ -121,7 +134,38 @@ app.get("/api/expenses/:userId", authenticateJWT, (req, res) => {
         return res.status(500).json({ error: "Failed to fetch expenses" });
       }
 
-      res.json(expenses);
+      // Group expenses by category
+      const categoryGroups = {};
+      const categoryTotals = {};
+      const categoryCounts = {};
+
+      expenses.forEach((expense) => {
+        const category = expense.category;
+
+        if (!categoryGroups[category]) {
+          categoryGroups[category] = [];
+          categoryTotals[category] = 0;
+          categoryCounts[category] = 0;
+        }
+
+        categoryGroups[category].push(expense);
+        categoryTotals[category] += parseFloat(expense.amount);
+        categoryCounts[category]++;
+      });
+
+      // Format the response
+      const result = {
+        expenses: expenses,
+        categoryGroups: categoryGroups,
+        categoryTotals: categoryTotals,
+        categoryCounts: categoryCounts,
+        totalExpenses: expenses.reduce(
+          (sum, expense) => sum + parseFloat(expense.amount),
+          0
+        ),
+      };
+
+      res.json(result);
       connection.end();
     });
   });
@@ -205,7 +249,8 @@ app.get("/api/income", authenticateJWT, (req, res) => {
         return res.status(500).json({ error: "Database connection failed" });
       }
 
-      const query = "SELECT amount, modified_at FROM income WHERE user_id = ?";
+      // Modified query to only select amount to be compatible with all database versions
+      const query = "SELECT amount FROM income WHERE user_id = ?";
       connection.query(query, [userId], (err, results) => {
         if (err) {
           console.error("Error fetching income:", err);
@@ -214,9 +259,8 @@ app.get("/api/income", authenticateJWT, (req, res) => {
         }
 
         const income = results.length > 0 ? results[0].amount : 0;
-        const modified_at = results.length > 0 ? results[0].modified_at : null;
 
-        res.json({ income, modified_at });
+        res.json({ income, lastUpdated: new Date().toISOString() });
         connection.end();
       });
     });
@@ -266,65 +310,6 @@ function isCategoryBudgeted(connection, userId, category) {
   });
 }
 
-// Add a new expense
-app.post("/addExpense", authenticateJWT, async (req, res) => {
-  const { date, description, category, amount } = req.body;
-  const userId = req.user.userId;
-  const ip = req.ip || req.connection.remoteAddress;
-
-  if (!date || !description || !category || !amount) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  const connection = createConnection();
-
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    // First check if there's a budget for this category
-    const checkBudgetQuery =
-      "SELECT * FROM budgets WHERE user_id = ? AND category = ?";
-    connection.query(
-      checkBudgetQuery,
-      [userId, category],
-      (err, budgetResults) => {
-        if (err) return handleError(res, "Error checking budget", err);
-
-        if (budgetResults.length === 0) {
-          logUserActivity(
-            userId,
-            "EXPENSE_ERROR",
-            `Attempted to add expense for unbudgeted category: ${category}`,
-            ip
-          );
-          return res.status(400).json({
-            message: `No budget found for category '${category}'. Please add a budget first.`,
-          });
-        }
-
-        const query =
-          "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
-        connection.query(
-          query,
-          [userId, date, description, category, amount],
-          (err, result) => {
-            if (err) return handleError(res, "Error adding expense", err);
-
-            logUserActivity(
-              userId,
-              "EXPENSE_ADDED",
-              `Added expense - Category: ${category}, Amount: Ksh ${amount}, Description: ${description}`,
-              ip
-            );
-            res.json({ message: "Expense added successfully" });
-            connection.end();
-          }
-        );
-      }
-    );
-  });
-});
-
 // Delete an expense
 app.delete("/deleteExpense/:id", authenticateJWT, async (req, res) => {
   try {
@@ -333,19 +318,17 @@ app.delete("/deleteExpense/:id", authenticateJWT, async (req, res) => {
     const ip = req.ip || req.connection.remoteAddress;
 
     // First verify the expense belongs to the user
-    const checkQuery = "SELECT user_id FROM expenses WHERE id = ?";
+    const checkQuery = "SELECT * FROM expenses WHERE id = ? AND user_id = ?";
     const connection = createConnection();
 
     connection.connect((err) => {
       if (err) return handleError(res, "Database connection error", err);
 
-      connection.query(checkQuery, [expenseId], (err, results) => {
+      connection.query(checkQuery, [expenseId, userId], (err, results) => {
         if (err) {
           console.error("Error checking expense ownership:", err);
           connection.end();
-          return res
-            .status(500)
-            .json({ message: "Error checking expense ownership" });
+          return handleError(res, "Error checking expense ownership", err);
         }
 
         if (results.length === 0) {
@@ -353,20 +336,13 @@ app.delete("/deleteExpense/:id", authenticateJWT, async (req, res) => {
           return res.status(404).json({ message: "Expense not found" });
         }
 
-        if (results[0].user_id !== userId) {
-          connection.end();
-          return res
-            .status(403)
-            .json({ message: "Not authorized to delete this expense" });
-        }
-
         // Delete the expense
-        const deleteQuery = "DELETE FROM expenses WHERE id = ? AND user_id = ?";
-        connection.query(deleteQuery, [expenseId, userId], (err, result) => {
+        const query = "DELETE FROM expenses WHERE id = ? AND user_id = ?";
+        connection.query(query, [expenseId, userId], (err, result) => {
           if (err) {
             console.error("Error deleting expense:", err);
             connection.end();
-            return res.status(500).json({ message: "Error deleting expense" });
+            return handleError(res, "Error deleting expense", err);
           }
 
           if (result.affectedRows === 0) {
@@ -507,7 +483,7 @@ app.get("/api/dashboardSummary/:userId", authenticateJWT, async (req, res) => {
     connection.connect((err) => {
       if (err) {
         console.error("Database connection error:", err);
-        return res.status(500).json({ error: "Database connection failed" });
+        return handleError(res, "Database connection failed", res, err);
       }
 
       // Get total budgeted amount
@@ -517,7 +493,7 @@ app.get("/api/dashboardSummary/:userId", authenticateJWT, async (req, res) => {
         if (err) {
           console.error("Error fetching budget total:", err);
           connection.end();
-          return res.status(500).json({ error: "Failed to fetch budget data" });
+          return handleError(res, "Failed to fetch budget data", res, err);
         }
 
         const totalBudgeted = budgetResult[0].totalBudgeted || 0;
@@ -529,9 +505,7 @@ app.get("/api/dashboardSummary/:userId", authenticateJWT, async (req, res) => {
           if (err) {
             console.error("Error fetching expense total:", err);
             connection.end();
-            return res
-              .status(500)
-              .json({ error: "Failed to fetch expense data" });
+            return handleError(res, "Failed to fetch expense data", res, err);
           }
 
           const totalExpenses = expenseResult[0].totalExpenses || 0;
@@ -542,9 +516,7 @@ app.get("/api/dashboardSummary/:userId", authenticateJWT, async (req, res) => {
             if (err) {
               console.error("Error fetching income:", err);
               connection.end();
-              return res
-                .status(500)
-                .json({ error: "Failed to fetch income data" });
+              return handleError(res, "Failed to fetch income data", res, err);
             }
 
             const income = incomeResult.length > 0 ? incomeResult[0].amount : 0;
@@ -767,7 +739,15 @@ function insertBudgetData(userId, frequency, category, amount, res, ip) {
 }
 
 //4. Expense routes
-function addExpenseData(userId, date, description, category, amount, res) {
+function insertExpenseData(
+  userId,
+  date,
+  description,
+  category,
+  amount,
+  res,
+  ip
+) {
   if (!date || !description || !category || !amount || isNaN(amount)) {
     return res.status(400).json({ message: "Invalid expense data" });
   }
@@ -775,29 +755,145 @@ function addExpenseData(userId, date, description, category, amount, res) {
   const connection = createConnection();
   connection.connect((err) => {
     if (err) return handleError(res, "Database connection error", err);
-    //check if expense for this category already exists
-    const checkQuery =
-      "SELECT * FROM expenses WHERE user_id = ? AND category = ?";
-    connection.query(checkQuery, [userId, category], (err, results) => {
-      if (err) return handleError(res, "Error checking existing expense", err);
-      if (results.length > 0) {
-        return res.status(400).json({
-          message: `An expense for ${category} already exists. Please update the existing expense instead.`,
-        });
-      }
-      //if no existing expense found, insert the new one
-      const query =
-        "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
-      connection.query(
-        query,
-        [userId, date, description, category, amount],
-        (err, result) => {
-          if (err) return handleError(res, "Error inserting data", err);
-          res.json({ message: "Expense added successfully" });
+
+    // First check if there's a budget for this category
+    const checkBudgetQuery =
+      "SELECT * FROM budgets WHERE user_id = ? AND category = ?";
+    connection.query(
+      checkBudgetQuery,
+      [userId, category],
+      (err, budgetResults) => {
+        if (err) {
           connection.end();
+          return handleError(res, "Error checking budget", err);
         }
-      );
-    });
+
+        // No budget exists for this category
+        if (budgetResults.length === 0) {
+          connection.end();
+          logUserActivity(
+            userId,
+            "EXPENSE_ERROR",
+            `Attempted to add expense for unbudgeted category: ${category}`,
+            ip
+          );
+          return res.status(400).json({
+            message: `No budget found for category '${category}'. Please add a budget first.`,
+          });
+        }
+
+        // Get total expenses in this category
+        const categoryExpensesQuery =
+          "SELECT SUM(amount) as category_total FROM expenses WHERE user_id = ? AND category = ?";
+        connection.query(
+          categoryExpensesQuery,
+          [userId, category],
+          (err, expenseResults) => {
+            if (err) {
+              connection.end();
+              return handleError(res, "Error checking category expenses", err);
+            }
+
+            const currentCategoryTotal = expenseResults[0].category_total || 0;
+            const newCategoryTotal =
+              parseFloat(currentCategoryTotal) + parseFloat(amount);
+            const budgetAmount = parseFloat(budgetResults[0].amount);
+
+            // Check if this would exceed the budget for this category
+            if (newCategoryTotal > budgetAmount) {
+              connection.end();
+              logUserActivity(
+                userId,
+                "EXPENSE_ERROR",
+                `Attempted to exceed budget for ${category}: ${newCategoryTotal} > ${budgetAmount}`,
+                ip
+              );
+              return res.status(400).json({
+                message: `This expense would exceed your budget for '${category}'. Budget: ${budgetAmount}, Already spent: ${currentCategoryTotal}`,
+              });
+            }
+
+            // Check total expenses against income
+            const incomeQuery = "SELECT amount FROM income WHERE user_id = ?";
+            connection.query(incomeQuery, [userId], (err, incomeResults) => {
+              if (err) {
+                connection.end();
+                return handleError(res, "Error checking income", err);
+              }
+
+              const income =
+                incomeResults.length > 0 ? incomeResults[0].amount : 0;
+
+              // Get total expenses across all categories
+              const totalExpensesQuery =
+                "SELECT SUM(amount) as totalExpenses FROM expenses WHERE user_id = ?";
+              connection.query(
+                totalExpensesQuery,
+                [userId],
+                (err, totalExpenseResults) => {
+                  if (err) {
+                    connection.end();
+                    return handleError(
+                      res,
+                      "Error checking total expenses",
+                      err
+                    );
+                  }
+
+                  const existingTotalExpenses =
+                    totalExpenseResults[0].totalExpenses || 0;
+                  const newTotalExpenses =
+                    parseFloat(existingTotalExpenses) + parseFloat(amount);
+
+                  if (newTotalExpenses > income) {
+                    connection.end();
+                    logUserActivity(
+                      userId,
+                      "EXPENSE_ERROR",
+                      `Attempted to exceed income: ${newTotalExpenses} > ${income}`,
+                      ip
+                    );
+                    return res.status(400).json({
+                      message: `Total expenses would exceed your monthly income of ${income}`,
+                    });
+                  }
+
+                  // All checks passed, insert the expense
+                  const query =
+                    "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
+                  connection.query(
+                    query,
+                    [userId, date, description, category, amount],
+                    (err, result) => {
+                      if (err) {
+                        connection.end();
+                        return handleError(res, "Error adding expense", err);
+                      }
+
+                      logUserActivity(
+                        userId,
+                        "EXPENSE_ADDED",
+                        `Added expense - Category: ${category}, Amount: KES ${amount}, Description: ${description}`,
+                        ip
+                      );
+
+                      res.json({
+                        message: "Expense added successfully",
+                        categoryTotal: newCategoryTotal,
+                        budgetRemaining: budgetAmount - newCategoryTotal,
+                        totalExpenses: newTotalExpenses,
+                        incomeRemaining: income - newTotalExpenses,
+                      });
+                      connection.end();
+                    }
+                  );
+                }
+              );
+            });
+          }
+        );
+      }
+    );
   });
 }
 
@@ -816,15 +912,36 @@ function getExpensesData(userId, res) {
 }
 
 //6. deleteExpenseData
-function deleteExpenseData(expenseId, res) {
+function deleteExpenseData(expenseId, userId, res, ip) {
   const connection = createConnection();
   connection.connect((err) => {
     if (err) return handleError(res, "Database connection error", err);
-    const query = "DELETE FROM expenses WHERE id = ?";
-    connection.query(query, [expenseId], (err, result) => {
-      if (err) return handleError(res, "Error deleting expense", err);
-      res.json({ message: "Expense deleted successfully" });
-      connection.end();
+
+    // First verify the expense belongs to the user
+    const checkQuery = "SELECT * FROM expenses WHERE id = ? AND user_id = ?";
+    connection.query(checkQuery, [expenseId, userId], (err, results) => {
+      if (err) return handleError(res, "Error checking expense ownership", err);
+
+      if (results.length === 0) {
+        connection.end();
+        return res.status(404).json({ message: "Expense not found" });
+      }
+
+      // Delete the expense
+      const query = "DELETE FROM expenses WHERE id = ? AND user_id = ?";
+      connection.query(query, [expenseId, userId], (err, result) => {
+        if (err) return handleError(res, "Error deleting expense", err);
+
+        logUserActivity(
+          userId,
+          "EXPENSE_DELETED",
+          `Deleted expense - ID: ${expenseId}`,
+          ip
+        );
+
+        res.json({ message: "Expense deleted successfully" });
+        connection.end();
+      });
     });
   });
 }
@@ -865,6 +982,39 @@ function getExpenseSummaryData(userId, res) {
     connection.query(query, [userId], (err, results) => {
       if (err) return handleError(res, "Error fetching expense summary", err);
       res.json(results[0]);
+      connection.end();
+    });
+  });
+}
+
+// Function to delete budget data
+function deleteBudgetData(budgetId, userId, res, ip) {
+  const connection = createConnection();
+
+  connection.connect((err) => {
+    if (err) return handleError(res, "Database connection error", err);
+
+    const query = "DELETE FROM budgets WHERE id = ? AND user_id = ?";
+    connection.query(query, [budgetId, userId], (err, result) => {
+      if (err) {
+        console.error("Error deleting budget:", err);
+        connection.end();
+        return handleError(res, "Failed to delete budget", err);
+      }
+
+      if (result.affectedRows === 0) {
+        connection.end();
+        return res.status(404).json({ message: "Budget not found" });
+      }
+
+      logUserActivity(
+        userId,
+        "BUDGET_DELETED",
+        `Deleted budget - ID: ${budgetId}`,
+        ip
+      );
+
+      res.json({ message: "Budget deleted successfully" });
       connection.end();
     });
   });
@@ -924,36 +1074,36 @@ connection.connect((err) => {
       email VARCHAR(255) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL
     )`,
-    `CREATE TABLE IF NOT EXISTS expenses (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT,
-      date DATE,
-      description VARCHAR(255),
-      category VARCHAR(255),
-      amount DECIMAL(10, 2),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`,
     `CREATE TABLE IF NOT EXISTS budgets (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       frequency VARCHAR(50) NOT NULL,
       category VARCHAR(100) NOT NULL,
-      amount DECIMAL(10, 2) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS expenses (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      date DATE NOT NULL,
+      description TEXT,
+      category VARCHAR(100) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`,
     `CREATE TABLE IF NOT EXISTS income (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
-      amount DECIMAL(10, 2) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`,
     `CREATE TABLE IF NOT EXISTS user_logs (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
+      user_id INT,
       action VARCHAR(100) NOT NULL,
       details TEXT,
       ip_address VARCHAR(45),
@@ -962,8 +1112,8 @@ connection.connect((err) => {
     )`,
   ];
 
-  tables.forEach((table) => {
-    connection.query(table, (err) => {
+  tables.forEach((tableQuery) => {
+    connection.query(tableQuery, (err) => {
       if (err) console.error("Error creating table:", err);
     });
   });
@@ -971,17 +1121,7 @@ connection.connect((err) => {
   connection.end();
 });
 
-app
-  .listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-  })
-  .on("error", (err) => {
-    if (err.code === "EADDRINUSE") {
-      console.error(
-        `Port ${port} is already in use. Please use a different port.`
-      );
-      process.exit(1);
-    } else {
-      throw err;
-    }
-  });
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
