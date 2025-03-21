@@ -2,7 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0 "
+      <meta
+      name="description"
+      content="Expense Tracker Dashboard - Track your income, expenses, and budgets with ease"
+    />
+    <meta name="author" content="ShelbyG2" />
+    <meta
+      name="keywords"
+      content="Expense Tracker, Budgeting, Finance Tracker, ShelbyG2"
+    />
+    <meta name="robots" content="index, follow" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Expense Tracker Dashboard</title>
     <link
@@ -21,6 +33,8 @@
     <div class="dashboard-container">
       <!-- Core Layout Components -->
       <aside class="sidebar">
+        <i class="fa-solid fa-bars" id="sidebar-toggle"></i>
+        <i class="fa-solid fa-xmark" id="sidebar-close"></i>
         <div class="sidebar-header">
           <i class="fas fa-wallet"></i>
           <h2>Finance Tracker</h2>
@@ -54,13 +68,6 @@
             Welcome back, <span id="username">User</span>!
           </div>
           <div class="auth-buttons">
-            <button
-              id="login-btn"
-              class="btn btn-secondary"
-              onclick="window.location.href='login.html'"
-            >
-              <i class="fas fa-sign-in-alt"></i> Login
-            </button>
             <button
               id="logout-btn"
               class="btn btn-secondary"
