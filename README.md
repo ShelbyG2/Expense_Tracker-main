@@ -2,38 +2,6 @@
 
 A comprehensive expense tracking and budgeting application built with Node.js, Express, and modern web technologies.
 
-## Project Structure
-
-```
-Expense_Tracker/
-├── public/                  # Client-side assets
-│   ├── css/                # Stylesheets
-│   │   ├── styles.css      # Main styles
-│   │   └── login.css       # Login page styles
-│   ├── js/                 # JavaScript files
-│   │   ├── index.js        # Main application logic
-│   │   ├── auth.js         # Authentication handling
-│   │   ├── login.js        # Login page logic
-│   │   └── reminder.js     # Reminder functionality
-│   └── html/               # HTML pages
-│       ├── index.html      # Main dashboard
-│       ├── login.html      # Login page
-│       └── reminder.html   # Reminder page
-├── server/                 # Server-side code
-│   ├── config/            # Configuration files
-│   │   └── .env           # Environment variables
-│   ├── routes/            # API routes
-│   │   ├── auth.js        # Authentication routes
-│   │   ├── budgets.js     # Budget management routes
-│   │   ├── expenses.js    # Expense management routes
-│   │   └── income.js      # Income management routes
-│   ├── models/            # Database models
-│   │   ├── User.js        # User model
-│   │   ├── Budget.js      # Budget model
-│   │   ├── Expense.js     # Expense model
-│   │   └── Income.js      # Income model
-│   └── server.js          # Main server file
-```
 
 ## Features
 
