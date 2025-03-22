@@ -31,13 +31,23 @@
   </head>
   <body>
     <div class="dashboard-container">
+      <!-- Mobile Toggle Button (outside sidebar) -->
+      <div id="sidebar-toggle">
+        <i class="fa-solid fa-bars"></i>
+      </div>
+
+      <!-- Sidebar Overlay -->
+      <div class="sidebar-overlay"></div>
+
       <!-- Core Layout Components -->
       <aside class="sidebar">
-        <i class="fa-solid fa-bars" id="sidebar-toggle"></i>
-        <i class="fa-solid fa-xmark" id="sidebar-close"></i>
+        <div id="sidebar-close">
+          <i class="fa-solid fa-xmark"></i>
+        </div>
         <div class="sidebar-header">
-          <i class="fas fa-wallet"></i>
-          <h2>Finance Tracker</h2>
+          <i class="fas fa-user"></i><br />
+          <span class="welcome-text">Welcome back,</span> <br />
+          <span id="username">User</span>
         </div>
         <nav class="sidebar-nav">
           <ul>
@@ -57,6 +67,15 @@
               <i class="fas fa-chart-pie"></i>
               <span>Analytics</span>
             </li>
+            <li id="dark-mode-toggle">
+              <i class="fas fa-moon"></i>
+              <span>Dark Mode</span>
+            </li>
+            <li>
+              <button id="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+              </button>
+            </li>
           </ul>
         </nav>
       </aside>
@@ -64,20 +83,11 @@
       <main class="main-content">
         <!-- Header Navigation -->
         <header class="top-nav">
-          <div class="welcome-text">
-            Welcome back, <span id="username">User</span>!
-          </div>
-          <div class="auth-buttons">
-            <button
-              id="logout-btn"
-              class="btn btn-secondary"
-              onclick="logout()"
-            >
-              <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
+          <div class="heading">
+            <i class="fas fa-wallet"></i>
+            <h2>Finance Tracker</h2>
           </div>
         </header>
-
         <!-- Main Dashboard Content -->
         <div class="dashboard-sections">
           <!-- Dashboard Overview -->

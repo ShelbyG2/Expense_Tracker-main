@@ -205,13 +205,26 @@ app.post("/api/expenses", authenticateJWT, (req, res) => {
 
                 // Check if adding this expense would exceed the category budget
                 if (newCategoryTotal > budget) {
+                  connection.end();
                   logUserActivity(
                     userId,
-                    "EXPENSE_WARNING",
-                    `Added expense (${category}: KES ${amount}) that exceeds category budget (KES ${budget})`,
+                    "EXPENSE_ERROR",
+                    `Attempted to add expense (${category}: KES ${amount}) that would exceed category budget (KES ${budget})`,
                     ip
                   );
-                  // We'll allow it but log a warning and notify the user
+                  return res.status(400).json({
+                    message: `This expense would exceed your budget for ${category}. 
+                    Budget limit: KES ${budget.toFixed(2)}, 
+                    Current total: KES ${currentCategoryTotal.toFixed(2)}, 
+                    This expense: KES ${parseFloat(amount).toFixed(2)}, 
+                    Would exceed by: KES ${(newCategoryTotal - budget).toFixed(
+                      2
+                    )}`,
+                    error: "budget_exceeded",
+                    categoryBudget: budget,
+                    currentCategoryTotal: currentCategoryTotal,
+                    newCategoryTotal: newCategoryTotal,
+                  });
                 }
 
                 // Now insert the expense

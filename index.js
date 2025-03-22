@@ -410,8 +410,53 @@ function formatCurrency(amount) {
   })}`;
 }
 
+// Function to show notifications
 function showNotification(message, type = "success") {
-  // Implementation of notification system
+  // Remove any existing notifications
+  const existingNotifications = document.querySelectorAll(".notification");
+  existingNotifications.forEach((notification) => notification.remove());
+
+  // Create new notification
+  const notification = document.createElement("div");
+  notification.className = `notification ${type}`;
+
+  // Set icon based on notification type
+  let icon;
+  switch (type) {
+    case "success":
+      icon = "fa-check-circle";
+      break;
+    case "error":
+      icon = "fa-exclamation-circle";
+      break;
+    case "warning":
+      icon = "fa-exclamation-triangle";
+      break;
+    default:
+      icon = "fa-info-circle";
+  }
+
+  notification.innerHTML = `
+    <div class="notification-content">
+      <i class="fas ${icon}"></i>
+      <span class="notification-message">${message}</span>
+    </div>
+  `;
+  document.body.appendChild(notification);
+
+  // Add special styling for budget warnings
+  if (message.includes("budget") && (type === "error" || type === "warning")) {
+    notification.style.borderLeftWidth = "4px";
+    notification.style.borderLeftColor =
+      type === "error" ? "var(--danger-color)" : "var(--warning-color)";
+  }
+
+  // Remove notification after 5 seconds (longer for errors)
+  const duration = type === "error" || type === "warning" ? 5000 : 3000;
+  setTimeout(() => {
+    notification.style.animation = "slideOut 0.3s ease-out";
+    setTimeout(() => notification.remove(), 300);
+  }, duration);
 }
 
 // Initialize Application
@@ -441,6 +486,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     // Setup form handlers
     setupFormHandlers();
+
+    // Setup dark mode
+    setupDarkMode();
   }
 
   // Add these event listeners to update dashboard
@@ -641,30 +689,6 @@ function addAuthHeader(headers = {}) {
 
   console.log("Request headers:", authHeaders);
   return authHeaders;
-}
-
-// Function to show notifications
-function showNotification(message, type = "success") {
-  // Remove any existing notifications
-  const existingNotifications = document.querySelectorAll(".notification");
-  existingNotifications.forEach((notification) => notification.remove());
-
-  // Create new notification
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.innerHTML = `
-    <i class="fas ${
-      type === "success" ? "fa-check-circle" : "fa-exclamation-circle"
-    }"></i>
-    ${message}
-  `;
-  document.body.appendChild(notification);
-
-  // Remove notification after 3 seconds
-  setTimeout(() => {
-    notification.style.animation = "slideOut 0.3s ease-out";
-    setTimeout(() => notification.remove(), 300);
-  }, 3000);
 }
 
 // Add event listeners
@@ -1405,11 +1429,13 @@ function switchSection(sectionId) {
 // Modal functions
 function showModal(modalId) {
   const modal = document.getElementById(modalId);
-  modal.style.display = "block";
+  modal.style.display = "flex"; // Use flex for centering
+  document.body.style.overflow = "hidden"; // Prevent scrolling of background
 }
 
 function closeModal(modal) {
   modal.style.display = "none";
+  document.body.style.overflow = "auto"; // Re-enable scrolling
 }
 
 function showIncomeModal() {
@@ -1596,17 +1622,84 @@ document.addEventListener("incomeUpdated", updateDashboard);
 
 // Add these helper functions to organize the setup code
 function setupNavigation() {
+  // Set up section switching
   const navItems = document.querySelectorAll(".sidebar-nav ul li");
   navItems.forEach((item) => {
     item.addEventListener("click", () => {
       const targetSection = item.getAttribute("data-section");
       console.log("Switching to section:", targetSection);
       switchSection(targetSection);
+
+      // Close sidebar on mobile after navigation
+      if (window.innerWidth <= 480) {
+        toggleSidebar(false);
+      }
     });
+  });
+
+  // Set up sidebar toggle for mobile
+  const sidebarToggle = document.getElementById("sidebar-toggle");
+  const sidebarClose = document.getElementById("sidebar-close");
+  const sidebar = document.querySelector(".sidebar");
+
+  // Create overlay element if it doesn't exist
+  if (!document.querySelector(".sidebar-overlay")) {
+    const overlay = document.createElement("div");
+    overlay.className = "sidebar-overlay";
+    document.body.appendChild(overlay);
+  }
+
+  const overlay = document.querySelector(".sidebar-overlay");
+
+  // Toggle button opens sidebar
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener("click", () => {
+      toggleSidebar(true);
+    });
+  }
+
+  // Close button closes sidebar
+  if (sidebarClose) {
+    sidebarClose.addEventListener("click", () => {
+      toggleSidebar(false);
+    });
+  }
+
+  // Clicking overlay closes sidebar
+  if (overlay) {
+    overlay.addEventListener("click", () => {
+      toggleSidebar(false);
+    });
+  }
+
+  // Function to toggle sidebar
+  function toggleSidebar(open) {
+    if (open) {
+      sidebar.classList.add("open");
+      overlay.classList.add("active");
+      document.body.style.overflow = "hidden"; // Prevent scrolling
+    } else {
+      sidebar.classList.remove("open");
+      overlay.classList.remove("active");
+      document.body.style.overflow = ""; // Restore scrolling
+    }
+  }
+
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 480 && sidebar.classList.contains("open")) {
+      toggleSidebar(false);
+    }
   });
 }
 
 function setupModals() {
+  // Hide all modals when page loads
+  const allModals = document.querySelectorAll(".modal");
+  allModals.forEach((modal) => {
+    modal.style.display = "none";
+  });
+
   const closeButtons = document.querySelectorAll(".close");
   closeButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -2162,6 +2255,13 @@ async function handleExpenseSubmit(event) {
 
     console.log("Sending expense data:", expenseData);
 
+    // Show loading indicator
+    const addExpenseBtn = document.getElementById("addExpenseBtn");
+    const originalBtnText = addExpenseBtn.innerHTML;
+    addExpenseBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    addExpenseBtn.disabled = true;
+
     // Call the API to add the expense
     const response = await fetch("/api/expenses", {
       method: "POST",
@@ -2171,36 +2271,94 @@ async function handleExpenseSubmit(event) {
       body: JSON.stringify(expenseData),
     });
 
+    // Reset button state
+    addExpenseBtn.innerHTML = originalBtnText;
+    addExpenseBtn.disabled = false;
+
+    // Handle the response
+    const responseData = await response.json();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Error submitting expense:", response.status, errorText);
+      console.error("Error adding expense:", response.status, responseData);
+
+      // Check if it's a budget exceeded error
+      if (responseData.error === "budget_exceeded") {
+        // Highlight the amount input field
+        const amountInput = document.getElementById("expenseAmount");
+        amountInput.classList.add("error");
+        amountInput.focus();
+
+        // Format a more user-friendly error message
+        let errorMessage = `Budget exceeded for ${category}!`;
+
+        if (responseData.categoryBudget && responseData.currentCategoryTotal) {
+          const budget = parseFloat(
+            responseData.categoryBudget
+          ).toLocaleString();
+          const current = parseFloat(
+            responseData.currentCategoryTotal
+          ).toLocaleString();
+          const expenseAmount = parseFloat(amount).toLocaleString();
+          const exceededBy = (
+            parseFloat(responseData.currentCategoryTotal) +
+            parseFloat(amount) -
+            parseFloat(responseData.categoryBudget)
+          ).toLocaleString();
+
+          errorMessage = `Budget exceeded for ${category}! Budget: KES ${budget}, Current: KES ${current}, This expense: KES ${expenseAmount}, Would exceed by: KES ${exceededBy}`;
+        } else if (responseData.message) {
+          errorMessage = responseData.message;
+        }
+
+        showNotification(errorMessage, "error");
+
+        // Add error indicator to the category remaining display
+        const remainingEl = document.getElementById("remainingBudget");
+        if (remainingEl) {
+          remainingEl.classList.add("danger");
+          remainingEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Budget limit exceeded!`;
+        }
+
+        return;
+      }
+
       showNotification(
-        "Failed to add expense: " + (errorText || response.statusText),
+        responseData.message || "Failed to add expense",
         "error"
       );
       return;
     }
 
-    const result = await response.json();
-    console.log("Expense added successfully:", result);
-    showNotification("Expense added successfully!", "success");
+    // Check if the response includes budgetExceeded warning
+    if (
+      responseData.budgetExceeded === false &&
+      responseData.categoryTotal / responseData.categoryBudget > 0.8
+    ) {
+      // Show warning if budget is over 80% used
+      const remaining =
+        responseData.categoryBudget - responseData.categoryTotal;
+      showNotification(
+        `Expense added, but your ${category} budget is now at ${Math.round(
+          (responseData.categoryTotal / responseData.categoryBudget) * 100
+        )}%. Only KES ${remaining.toFixed(2)} remaining.`,
+        "warning"
+      );
+    } else {
+      // Show success notification
+      showNotification("Expense added successfully", "success");
+    }
 
-    // Reset form
+    // Reset the form and close the modal
     expenseForm.reset();
+    closeModal(document.getElementById("expenseModal"));
 
-    // Reload expenses to update the list
-    await loadExpenses();
-
-    // Explicitly dispatch events to update charts
-    console.log("Dispatching expense events for chart updates");
-    document.dispatchEvent(new Event("expenseAdded"));
-    document.dispatchEvent(new Event("expenseUpdated"));
-
-    // Update dashboard
-    updateDashboard(userId);
+    // Update the UI
+    loadExpenses();
+    updateAnalyticsCharts(userId);
+    document.dispatchEvent(new CustomEvent("expense-added"));
   } catch (error) {
     console.error("Error submitting expense:", error);
-    showNotification("Failed to add expense: " + error.message, "error");
+    showNotification("Failed to add expense. Please try again.", "error");
   }
 }
 
@@ -2278,5 +2436,246 @@ async function submitBudgetForm(event) {
   } catch (error) {
     console.error("Error submitting budget:", error);
     showNotification("Failed to add budget: " + error.message, "error");
+  }
+}
+
+// Dark mode functionality
+function setupDarkMode() {
+  const darkModeToggle = document.getElementById("dark-mode-toggle");
+  const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+  // Check for saved user preference, or use system preference
+  const savedTheme = localStorage.getItem("theme");
+
+  // Initialize dark mode based on saved preference or system preference
+  if (savedTheme === "dark" || (!savedTheme && prefersDarkScheme.matches)) {
+    document.documentElement.setAttribute("data-theme", "dark");
+    updateDarkModeIcon(true);
+  } else {
+    document.documentElement.setAttribute("data-theme", "light");
+    updateDarkModeIcon(false);
+  }
+
+  // Add event listener to toggle button
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener("click", () => {
+      const isDarkMode =
+        document.documentElement.getAttribute("data-theme") === "dark";
+
+      if (isDarkMode) {
+        document.documentElement.setAttribute("data-theme", "light");
+        localStorage.setItem("theme", "light");
+      } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+        localStorage.setItem("theme", "dark");
+      }
+
+      updateDarkModeIcon(!isDarkMode);
+
+      // Update charts if they exist to reflect the new theme
+      const userId = localStorage.getItem("userId");
+      if (userId) {
+        try {
+          updateAnalyticsCharts(userId);
+        } catch (e) {
+          console.log("Charts not available to update with theme");
+        }
+      }
+    });
+  }
+
+  // Also listen for system changes
+  prefersDarkScheme.addEventListener("change", (e) => {
+    if (!localStorage.getItem("theme")) {
+      // Only auto-switch if user hasn't set preference
+      const shouldBeDark = e.matches;
+      document.documentElement.setAttribute(
+        "data-theme",
+        shouldBeDark ? "dark" : "light"
+      );
+      updateDarkModeIcon(shouldBeDark);
+    }
+  });
+}
+
+// Update the dark mode toggle icon based on current mode
+function updateDarkModeIcon(isDarkMode) {
+  const darkModeToggle = document.getElementById("dark-mode-toggle");
+  if (darkModeToggle) {
+    const icon = darkModeToggle.querySelector("i");
+    const text = darkModeToggle.querySelector("span");
+
+    if (isDarkMode) {
+      icon.className = "fas fa-sun";
+      text.textContent = "Light Mode";
+    } else {
+      icon.className = "fas fa-moon";
+      text.textContent = "Dark Mode";
+    }
+  }
+}
+
+// Helper function to get theme-aware chart colors
+function getChartColors() {
+  const isDarkMode =
+    document.documentElement.getAttribute("data-theme") === "dark";
+
+  return {
+    gridColor: isDarkMode ? "#444444" : "#e5e5e5", // Darker grid lines for better contrast
+    textColor: isDarkMode ? "#ffffff" : "#666666", // Brighter text in dark mode
+    titleColor: isDarkMode ? "#9d97ff" : "#6c63ff", // Highlighted titles in dark mode
+    backgroundColor: isDarkMode ? "#1e1e1e" : "white",
+    pieColors: [
+      "rgba(108, 99, 255, 0.9)", // Primary - increased opacity
+      "rgba(0, 224, 176, 0.9)", // Secondary
+      "rgba(255, 126, 95, 0.9)", // Accent
+      "rgba(255, 77, 109, 0.9)", // Danger
+      "rgba(255, 209, 102, 0.9)", // Warning
+      "rgba(125, 95, 255, 0.9)", // Primary variant
+      "rgba(0, 179, 147, 0.9)", // Secondary variant
+      "rgba(255, 95, 66, 0.9)", // Accent variant
+    ],
+    borderColors: isDarkMode
+      ? ["rgba(255, 255, 255, 0.2)"] // Brighter borders in dark mode
+      : ["rgba(0, 0, 0, 0.1)"],
+    tooltipBackgroundColor: isDarkMode
+      ? "rgba(40, 40, 40, 0.9)"
+      : "rgba(255, 255, 255, 0.9)",
+    tooltipTextColor: isDarkMode ? "#ffffff" : "#333333",
+  };
+}
+
+// Update this function to use theme colors
+function updateBudgetVsExpenseChart(budgets, expenses) {
+  try {
+    const ctx = document.getElementById("budgetVsExpenseChart");
+    if (!ctx) {
+      console.error("Chart canvas element not found");
+      return;
+    }
+
+    // Clear any existing chart
+    if (window.budgetVsExpenseChart) {
+      window.budgetVsExpenseChart.destroy();
+    }
+
+    const categories = budgets.map((budget) => budget.category);
+    const budgetAmounts = budgets.map((budget) => parseFloat(budget.amount));
+
+    // Calculate expense amount per category
+    const expenseAmounts = [];
+    for (const category of categories) {
+      const categoryExpenses = expenses.filter(
+        (expense) => expense.category === category
+      );
+      const totalAmount = categoryExpenses.reduce(
+        (sum, expense) => sum + parseFloat(expense.amount),
+        0
+      );
+      expenseAmounts.push(totalAmount);
+    }
+
+    // Get theme-aware colors
+    const chartColors = getChartColors();
+
+    window.budgetVsExpenseChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: categories,
+        datasets: [
+          {
+            label: "Budget",
+            backgroundColor: "rgba(0, 224, 176, 0.7)",
+            borderColor: "rgba(0, 224, 176, 1)",
+            borderWidth: 1,
+            data: budgetAmounts,
+          },
+          {
+            label: "Expenses",
+            backgroundColor: "rgba(255, 77, 109, 0.7)",
+            borderColor: "rgba(255, 77, 109, 1)",
+            borderWidth: 1,
+            data: expenseAmounts,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: chartColors.gridColor,
+            },
+            ticks: {
+              color: chartColors.textColor,
+              font: {
+                weight: 500, // Make y-axis labels bolder
+              },
+            },
+          },
+          x: {
+            grid: {
+              color: chartColors.gridColor,
+            },
+            ticks: {
+              color: chartColors.textColor,
+              font: {
+                weight: 500, // Make x-axis labels bolder
+              },
+            },
+          },
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: chartColors.textColor,
+              font: {
+                weight: 600, // Bolder legend text
+              },
+              padding: 15, // More space around legend items
+            },
+          },
+          title: {
+            display: true,
+            text: "Budget vs. Expenses",
+            color: chartColors.titleColor, // Use the title color
+            font: {
+              size: 16,
+              weight: 600,
+            },
+            padding: {
+              top: 10,
+              bottom: 20,
+            },
+          },
+          tooltip: {
+            backgroundColor: chartColors.tooltipBackgroundColor,
+            titleColor: chartColors.tooltipTextColor,
+            bodyColor: chartColors.tooltipTextColor,
+            padding: 12,
+            cornerRadius: 6,
+            displayColors: true, // Show colored boxes in tooltips
+            titleFont: {
+              weight: "bold",
+              size: 14,
+            },
+            bodyFont: {
+              size: 13,
+            },
+            callbacks: {
+              label: (context) => {
+                return `${
+                  context.dataset.label
+                }: KES ${context.raw.toLocaleString()}`;
+              },
+            },
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error updating budget vs expense chart:", error);
   }
 }
