@@ -4,8 +4,8 @@
   "description": "A comprehensive expense tracking and budgeting application",
   "main": "server/server.js",
   "scripts": {
-    "start": "node server/server.js",
-    "dev": "nodemon server/server.js",
+    "start": "server.js",
+    "dev": "server.js",
     "test": "jest"
   },
   "dependencies": {

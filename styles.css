@@ -102,6 +102,7 @@
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px var(--focus-outline);
   outline: none;
+  background-color: var(--dark-color);
 }
 
 [data-theme="dark"] input::placeholder {
@@ -661,6 +662,11 @@ textarea.error {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
 }
 
+.card:hover .card-icon {
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 150%;
+}
 .card-header {
   display: flex;
   justify-content: space-between;
