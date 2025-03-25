@@ -1,4 +1,21 @@
 # ...existing code...
 *.enx
 *.env
+node_modules/
+# Ignore logs
+logs
+*.log
+npm-debug.log*
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore build files
+dist/
+build/
+
+# Ignore IDE files
+.vscode/
+.idea/
 # ...existing code...

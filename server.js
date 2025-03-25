@@ -1,6 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const mysql = require("mysql");
+const mysql = require("mysql2"); // Updated to use mysql2
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
@@ -13,6 +13,21 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
+const WebSocket = require("ws");
+const wss = new WebSocket.Server({ port: 8080 });
+
+wss.on("connection", (ws) => {
+  console.log("Client connected");
+  ws.on("close", () => console.log("Client disconnected"));
+});
+
+function broadcastIncomeUpdate(userId, amount) {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ userId, amount }));
+    }
+  });
+}
 // JWT Authentication Middleware
 const authenticateJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -985,3 +1000,38 @@ app
       throw err;
     }
   });
+
+function insertExpenseData(
+  userId,
+  date,
+  description,
+  category,
+  amount,
+  res,
+  ip
+) {
+  const connection = createConnection();
+
+  connection.connect((err) => {
+    if (err) return handleError(res, "Database connection error", err);
+
+    const query =
+      "INSERT INTO expenses (user_id, date, description, category, amount) VALUES (?, ?, ?, ?, ?)";
+    connection.query(
+      query,
+      [userId, date, description, category, amount],
+      (err, result) => {
+        if (err) return handleError(res, "Error inserting data", err);
+
+        logUserActivity(
+          userId,
+          "EXPENSE_ADDED",
+          `Added expense - Category: ${category}, Amount: Ksh ${amount}, Description: ${description}`,
+          ip
+        );
+        res.json({ message: "Expense added successfully" });
+        connection.end();
+      }
+    );
+  });
+}
