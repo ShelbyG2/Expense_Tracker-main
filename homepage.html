@@ -2,7 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0 "
+      <meta
+      name="description"
+      content="Expense Tracker Dashboard - Track your income, expenses, and budgets with ease"
+    />
+    <meta name="author" content="ShelbyG2" />
+    <meta
+      name="keywords"
+      content="Expense Tracker, Budgeting, Finance Tracker, ShelbyG2"
+    />
+    <meta name="robots" content="index, follow" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Expense Tracker Dashboard</title>
     <link
@@ -13,16 +25,29 @@
       referrerpolicy="no-referrer"
     />
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="auth.js" defer></script>
+    <script src="index.js" defer></script>
   </head>
   <body>
     <div class="dashboard-container">
+      <!-- Mobile Toggle Button (outside sidebar) -->
+      <div id="sidebar-toggle">
+        <i class="fa-solid fa-bars"></i>
+      </div>
+
+      <!-- Sidebar Overlay -->
+      <div class="sidebar-overlay"></div>
+
       <!-- Core Layout Components -->
       <aside class="sidebar">
+        <div id="sidebar-close">
+          <i class="fa-solid fa-xmark"></i>
+        </div>
         <div class="sidebar-header">
-          <i class="fas fa-wallet"></i>
-          <h2>Finance Tracker</h2>
+          <i class="fas fa-user"></i><br />
+          <span class="welcome-text">Welcome back,</span> <br />
+          <span id="username">User</span>
         </div>
         <nav class="sidebar-nav">
           <ul>
@@ -42,6 +67,15 @@
               <i class="fas fa-chart-pie"></i>
               <span>Analytics</span>
             </li>
+            <li id="dark-mode-toggle">
+              <i class="fas fa-moon"></i>
+              <span>Dark Mode</span>
+            </li>
+            <li>
+              <button id="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+              </button>
+            </li>
           </ul>
         </nav>
       </aside>
@@ -49,27 +83,11 @@
       <main class="main-content">
         <!-- Header Navigation -->
         <header class="top-nav">
-          <div class="welcome-text">
-            Welcome back, <span id="username">User</span>!
-          </div>
-          <div class="auth-buttons">
-            <button
-              id="login-btn"
-              class="btn btn-secondary"
-              onclick="window.location.href='login.html'"
-            >
-              <i class="fas fa-sign-in-alt"></i> Login
-            </button>
-            <button
-              id="logout-btn"
-              class="btn btn-secondary"
-              onclick="logout()"
-            >
-              <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
+          <div class="heading">
+            <i class="fas fa-wallet"></i>
+            <h2>Finance Tracker</h2>
           </div>
         </header>
-
         <!-- Main Dashboard Content -->
         <div class="dashboard-sections">
           <!-- Dashboard Overview -->
@@ -118,12 +136,18 @@
             <div class="charts-container">
               <div class="row">
                 <div class="col-md-6">
-                  <div class="chart-container">
+                  <div
+                    class="chart-container"
+                    style="position: relative; height: 300px; width: 100%"
+                  >
                     <canvas id="expensePieChart"></canvas>
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <div class="chart-container">
+                  <div
+                    class="chart-container"
+                    style="position: relative; height: 300px; width: 100%"
+                  >
                     <canvas id="budgetVsExpenseChart"></canvas>
                   </div>
                 </div>
@@ -164,12 +188,18 @@
             </div>
             <div class="analytics-container">
               <div class="chart-wrapper">
-                <div class="chart-container">
+                <div
+                  class="chart-container"
+                  style="position: relative; height: 400px; width: 100%"
+                >
                   <canvas id="monthlyTrendChart"></canvas>
                 </div>
               </div>
               <div class="chart-wrapper">
-                <div class="chart-container">
+                <div
+                  class="chart-container"
+                  style="position: relative; height: 400px; width: 100%"
+                >
                   <canvas id="categoryComparisonChart"></canvas>
                 </div>
               </div>
@@ -357,7 +387,5 @@
         min-height: 450px; /* Minimum height for the chart */
       }
     </style>
-
-    <script src="index.js"></script>
   </body>
 </html>
