@@ -17,7 +17,12 @@
     <div class="container">
       <div class="forms-container">
         <div class="signin-signup">
-          <form action="/signin" class="sign-in-form" method="post">
+          <form
+            action="/signin"
+            class="sign-in-form"
+            method="post"
+            onsubmit="event.preventDefault(); login(event);"
+          >
             <h2 class="title">Sign in</h2>
             <div class="input-field">
               <i class="fas fa-user"></i>
@@ -44,7 +49,12 @@
               </a>
             </div>
           </form>
-          <form action="/signup" method="post" class="sign-up-form">
+          <form
+            action="/signup"
+            method="post"
+            class="sign-up-form"
+            onsubmit="event.preventDefault(); submitSignUpForm(this.querySelector('input[name=\'username\']').value, this.querySelector('input[name=\'email\']').value, this.querySelector('input[name=\'password\']').value);"
+          >
             <h2 class="title">Sign up</h2>
             <div class="input-field">
               <i class="fas fa-user"></i>

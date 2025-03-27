@@ -13,42 +13,7 @@ signInBtn.addEventListener("click", () => {
 const signInForm = document.querySelector(".sign-in-form");
 const signUpForm = document.querySelector(".sign-up-form");
 
-signInForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const username = signInForm.querySelector("input[name='username']").value;
-  const password = signInForm.querySelector("input[name='password']").value;
-
-  if (username === "" || password === "") {
-    showNotification("Please fill in all fields", "error");
-    return;
-  }
-
-  try {
-    const response = await fetch("/signin", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Store the JWT token in localStorage
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("userId", data.userId);
-      localStorage.setItem("userName", data.username);
-      showNotification("Login successful", "success");
-      window.location.href = "/home";
-    } else {
-      showNotification(data.message || "Login failed", "error");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    showNotification("An error occurred during login", "error");
-  }
-});
+signInForm.addEventListener("submit", login);
 
 signUpForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -71,6 +36,7 @@ function validateEmail(email) {
 
 async function submitSignUpForm(username, email, password) {
   try {
+    console.log("Attempting to sign up user:", username);
     const response = await fetch("/signup", {
       method: "POST",
       headers: {
@@ -78,11 +44,21 @@ async function submitSignUpForm(username, email, password) {
       },
       body: JSON.stringify({ username, email, password }),
     });
-    const data = await response.text();
-    container.classList.remove("sign-up-mode");
-    showNotification(data, "success");
+
+    const data = await response.json();
+    console.log("Signup response:", data);
+
+    if (response.ok) {
+      container.classList.remove("sign-up-mode");
+      showNotification("Registration successful! Please log in.", "success");
+      // Clear the form
+      signUpForm.reset();
+    } else {
+      showNotification(data.message || "Registration failed", "error");
+    }
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Signup error:", error);
+    showNotification("An error occurred during registration", "error");
   }
 }
 
@@ -94,4 +70,79 @@ function showNotification(message, type) {
   setTimeout(() => {
     notification.remove();
   }, 3000);
+}
+
+// Add this at the top of the file
+async function checkServerHealth() {
+  try {
+    const response = await fetch("/api/health");
+    return response.ok;
+  } catch (error) {
+    console.error("Server health check failed:", error);
+    return false;
+  }
+}
+
+// Update the login function to use the correct form selectors
+async function login(event) {
+  event.preventDefault();
+  const username = signInForm.querySelector("input[name='username']").value;
+  const password = signInForm.querySelector("input[name='password']").value;
+  const loginButton = signInForm.querySelector('input[type="submit"]');
+
+  if (!username || !password) {
+    showNotification("Please enter both username and password", "error");
+    return;
+  }
+
+  try {
+    loginButton.disabled = true;
+    loginButton.value = "Signing in...";
+
+    // Check server health first
+    const healthResponse = await fetch("/api/health");
+    if (!healthResponse.ok) {
+      throw new Error("Server is not responding");
+    }
+
+    const response = await fetch("/signin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await response.json();
+    console.log("Login response:", data);
+
+    if (data.success) {
+      // Store user data
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userId", data.userId);
+      localStorage.setItem("username", data.username);
+
+      // Apply user settings if available
+      if (data.settings) {
+        localStorage.setItem("userSettings", JSON.stringify(data.settings));
+        if (data.settings.theme) {
+          document.body.setAttribute("data-theme", data.settings.theme);
+        }
+      }
+
+      showNotification("Login successful!", "success");
+      window.location.href = "/home";
+    } else {
+      showNotification(data.message || "Login failed", "error");
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    showNotification(
+      error.message || "Login failed. Please try again.",
+      "error"
+    );
+  } finally {
+    loginButton.disabled = false;
+    loginButton.value = "Sign In";
+  }
 }

@@ -4,6 +4,8 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
 body,
@@ -442,4 +444,22 @@ form.sign-in-form {
 
 .notification.info {
   background-color: #2196f3;
+}
+
+/* Hide scroll bars for WebKit browsers (Chrome, Safari) */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure the body and html elements don't show scroll bars */
+html,
+body {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }

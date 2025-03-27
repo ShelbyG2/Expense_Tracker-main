@@ -28,6 +28,44 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <script src="auth.js" defer></script>
     <script src="index.js" defer></script>
+    <script>
+      // Prevent flash of incorrect theme and currency
+      (function () {
+        const savedSettings = localStorage.getItem("userSettings");
+        const settings = savedSettings ? JSON.parse(savedSettings) : {};
+
+        // Apply theme
+        const theme = settings.theme || localStorage.getItem("theme");
+        if (
+          theme === "dark" ||
+          (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches)
+        ) {
+          document.documentElement.setAttribute("data-theme", "dark");
+          document.body.classList.add("dark-mode");
+        } else {
+          document.documentElement.setAttribute("data-theme", "light");
+          document.body.classList.remove("dark-mode");
+        }
+
+        // Apply currency
+        const currency = settings.currency || "KES";
+        // Update all currency symbols in the DOM
+        const currencyElements = document.querySelectorAll(".currency-symbol");
+        currencyElements.forEach((el) => {
+          el.textContent = currency;
+        });
+
+        // Update any hardcoded currency symbols in the HTML
+        const htmlContent = document.documentElement.innerHTML;
+        const updatedHtml = htmlContent.replace(/KES/g, currency);
+        if (htmlContent !== updatedHtml) {
+          document.documentElement.innerHTML = updatedHtml;
+        }
+
+        // Set a global variable for currency to be used by charts
+        window.currentCurrency = currency;
+      })();
+    </script>
   </head>
   <body>
     <div class="dashboard-container">
@@ -67,9 +105,25 @@
               <i class="fas fa-chart-pie"></i>
               <span>Analytics</span>
             </li>
+            <li data-section="history">
+              <i class="fas fa-history"></i>
+              <span>History</span>
+            </li>
+            <li data-section="settings">
+              <i class="fas fa-cog"></i>
+              <span>Settings</span>
+            </li>
             <li id="dark-mode-toggle">
               <i class="fas fa-moon"></i>
               <span>Dark Mode</span>
+            </li>
+            <li class="nav-item" data-section="saving-goals">
+              <i class="fas fa-piggy-bank"></i>
+              <span>Saving Goals</span>
+            </li>
+            <li class="nav-item" data-section="reminders">
+              <i class="fas fa-bell"></i>
+              <span>Reminders</span>
             </li>
             <li>
               <button id="logout-btn" onclick="logout()">
@@ -99,7 +153,9 @@
                 </div>
                 <div class="card-content">
                   <h3>Monthly Income</h3>
-                  <p id="totalIncome">KES 0.00</p>
+                  <p id="totalIncome">
+                    <span class="currency-symbol">KES</span> 0.00
+                  </p>
                   <button class="btn btn-small" onclick="showIncomeModal()">
                     <i class="fas fa-edit"></i> Update
                   </button>
@@ -111,7 +167,9 @@
                 </div>
                 <div class="card-content">
                   <h3>Total Expenses</h3>
-                  <p id="totalExpenses">KES 0.00</p>
+                  <p id="totalExpenses">
+                    <span class="currency-symbol">KES</span> 0.00
+                  </p>
                 </div>
               </div>
               <div class="card">
@@ -120,7 +178,9 @@
                 </div>
                 <div class="card-content">
                   <h3>Total Budgeted</h3>
-                  <p id="totalBudgeted">KES 0.00</p>
+                  <p id="totalBudgeted">
+                    <span class="currency-symbol">KES</span> 0.00
+                  </p>
                 </div>
               </div>
               <div class="card">
@@ -129,7 +189,9 @@
                 </div>
                 <div class="card-content">
                   <h3>Remaining Budget</h3>
-                  <p id="remainingBudget">KES 0.00</p>
+                  <p id="remainingBudget">
+                    <span class="currency-symbol">KES</span> 0.00
+                  </p>
                 </div>
               </div>
             </div>
@@ -185,6 +247,22 @@
           <section id="charts" class="section">
             <div class="section-header">
               <h2><i class="fas fa-chart-pie"></i> Financial Analytics</h2>
+              <div class="export-buttons">
+                <button
+                  class="btn btn-pdf"
+                  onclick="exportToPDF()"
+                  data-tooltip="Download complete financial report with expenses, budgets, and summaries in PDF format"
+                >
+                  <i class="fas fa-file-pdf"></i> Export PDF
+                </button>
+                <button
+                  class="btn btn-excel"
+                  onclick="exportToExcel()"
+                  data-tooltip="Download Excel workbook with separate sheets for expenses, budgets, and financial summary"
+                >
+                  <i class="fas fa-file-excel"></i> Export Excel
+                </button>
+              </div>
             </div>
             <div class="analytics-container">
               <div class="chart-wrapper">
@@ -202,6 +280,211 @@
                 >
                   <canvas id="categoryComparisonChart"></canvas>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- User Activity History -->
+          <section id="history" class="section">
+            <div class="section-header">
+              <h2><i class="fas fa-history"></i> Activity History</h2>
+            </div>
+            <div class="history-container">
+              <div class="activity-timeline">
+                <div class="loading-spinner" id="historyLoadingSpinner">
+                  <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <ul id="userActivityList" class="activity-list"></ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- User Settings -->
+          <section id="settings" class="section">
+            <div class="section-header">
+              <h2><i class="fas fa-cog"></i> User Settings</h2>
+            </div>
+            <div class="settings-container">
+              <form id="settingsForm">
+                <div class="settings-group">
+                  <h3>Display Settings</h3>
+
+                  <div class="form-group">
+                    <label for="settingCurrency">
+                      <i class="fas fa-money-bill-wave"></i> Currency Symbol:
+                    </label>
+                    <select id="settingCurrency" name="currency">
+                      <option value="KES">KES (Kenyan Shilling)</option>
+                      <option value="USD">USD (US Dollar)</option>
+                      <option value="EUR">EUR (Euro)</option>
+                      <option value="GBP">GBP (British Pound)</option>
+                      <option value="INR">INR (Indian Rupee)</option>
+                      <option value="NGN">NGN (Nigerian Naira)</option>
+                      <option value="ZAR">ZAR (South African Rand)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="settingTheme">
+                      <i class="fas fa-palette"></i> Theme:
+                    </label>
+                    <select id="settingTheme" name="theme">
+                      <option value="light">Light Mode</option>
+                      <option value="dark">Dark Mode</option>
+                      <option value="system">System Default</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="settingDefaultView">
+                      <i class="fas fa-home"></i> Default Dashboard View:
+                    </label>
+                    <select id="settingDefaultView" name="default_view">
+                      <option value="summary">Dashboard Overview</option>
+                      <option value="budgeting">Budgets</option>
+                      <option value="expense-tracker">Expenses</option>
+                      <option value="charts">Analytics</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-group">
+                  <h3>Budget Settings</h3>
+
+                  <div class="form-group">
+                    <label for="settingDefaultBudgetPeriod">
+                      <i class="fas fa-calendar"></i> Default Budget Period:
+                    </label>
+                    <select
+                      id="settingDefaultBudgetPeriod"
+                      name="default_budget_period"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="settingExpenseCategories">
+                      <i class="fas fa-tags"></i> Customize Expense Categories:
+                    </label>
+                    <div class="tag-input-container">
+                      <input
+                        type="text"
+                        id="categoryInput"
+                        placeholder="Add new category"
+                      />
+                      <button
+                        type="button"
+                        id="addCategoryBtn"
+                        class="btn btn-small"
+                      >
+                        <i class="fas fa-plus"></i>
+                      </button>
+                    </div>
+                    <div id="categoriesList" class="tags-container">
+                      <!-- Categories will be added here dynamically -->
+                    </div>
+                    <input
+                      type="hidden"
+                      id="settingExpenseCategories"
+                      name="expense_categories"
+                    />
+                  </div>
+                </div>
+
+                <div class="settings-group">
+                  <h3>Export Settings</h3>
+
+                  <div class="form-group">
+                    <label for="settingReportFormat">
+                      <i class="fas fa-file-export"></i> Default Report Format:
+                    </label>
+                    <select id="settingReportFormat" name="report_format">
+                      <option value="pdf">PDF Format</option>
+                      <option value="excel">Excel Format</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button
+                    type="button"
+                    id="saveSettingsBtn"
+                    class="btn btn-primary"
+                  >
+                    Save Settings
+                  </button>
+                  <button
+                    type="button"
+                    id="resetSettingsBtn"
+                    class="btn btn-secondary"
+                  >
+                    Reset to Defaults
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <!-- Saving Goals -->
+          <section id="saving-goals" class="section">
+            <div class="section-header">
+              <h2>Saving Goals</h2>
+              <button class="btn" onclick="showModal('goalModal')">
+                <i class="fas fa-plus"></i> Add Goal
+              </button>
+            </div>
+            <div class="saving-goals-container">
+              <div class="goals-summary">
+                <div class="summary-card">
+                  <h3>Total Savings</h3>
+                  <p class="amount">
+                    <span class="currency-symbol">KES</span>
+                    <span id="totalSavings">0</span>
+                  </p>
+                </div>
+                <div class="summary-card">
+                  <h3>Active Goals</h3>
+                  <p class="amount" id="activeGoalsCount">0</p>
+                </div>
+                <div class="summary-card">
+                  <h3>Completed Goals</h3>
+                  <p class="amount" id="completedGoalsCount">0</p>
+                </div>
+              </div>
+              <div class="goals-list" id="goalsList">
+                <!-- Goals will be dynamically added here -->
+              </div>
+            </div>
+          </section>
+
+          <!-- Reminders -->
+          <section id="reminders" class="section">
+            <div class="section-header">
+              <h2>Reminders</h2>
+              <button class="btn" data-modal-target="addReminderModal">
+                <i class="fas fa-plus"></i> Add Reminder
+              </button>
+            </div>
+            <div class="reminders-container">
+              <div class="reminders-summary">
+                <div class="summary-card">
+                  <h3>Upcoming</h3>
+                  <p class="amount" id="upcomingRemindersCount">0</p>
+                </div>
+                <div class="summary-card">
+                  <h3>Completed</h3>
+                  <p class="amount" id="completedRemindersCount">0</p>
+                </div>
+                <div class="summary-card">
+                  <h3>Overdue</h3>
+                  <p class="amount" id="overdueRemindersCount">0</p>
+                </div>
+              </div>
+              <div class="reminders-list" id="remindersList">
+                <!-- Reminders will be dynamically inserted here -->
               </div>
             </div>
           </section>
@@ -346,6 +629,76 @@
       </div>
     </div>
 
+    <!-- Add Reminder Modal -->
+    <div id="addReminderModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-bell"></i> Add New Reminder</h3>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="addReminderForm">
+            <div class="form-group">
+              <label for="reminderTitle">Title</label>
+              <input type="text" id="reminderTitle" name="title" required />
+            </div>
+            <div class="form-group">
+              <label for="reminderDescription">Description</label>
+              <textarea
+                id="reminderDescription"
+                name="description"
+                required
+              ></textarea>
+            </div>
+            <div class="form-group">
+              <label for="dueDate">Due Date</label>
+              <input
+                type="datetime-local"
+                id="dueDate"
+                name="due_date"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="priority">Priority</label>
+              <select id="priority" name="priority" required>
+                <option value="">Select priority</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="type">Type</label>
+              <select id="type" name="type" required>
+                <option value="">Select type</option>
+                <option value="bill_payment">Bill Payment</option>
+                <option value="budget_review">Budget Review</option>
+                <option value="saving_goal_check">Saving Goal Check</option>
+                <option value="income_update">Income Update</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="hideModal('addReminderModal')"
+              >
+                Cancel
+              </button>
+              <button type="submit" class="btn">Add Reminder</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reminders List Container -->
+    <div id="remindersList" class="reminders-list">
+      <!-- Reminders will be dynamically inserted here -->
+    </div>
+
     <!-- Analytics Styles -->
     <style>
       .analytics-container {
@@ -387,5 +740,550 @@
         min-height: 450px; /* Minimum height for the chart */
       }
     </style>
+
+    <!-- Goal Modal -->
+    <div id="goalModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Add New Saving Goal</h2>
+          <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+          <form id="goalForm">
+            <div class="form-group">
+              <label for="goalName">Goal Name *</label>
+              <input
+                type="text"
+                id="goalName"
+                name="name"
+                required
+                placeholder="Enter goal name"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="goalTargetAmount">Target Amount (KES) *</label>
+              <input
+                type="number"
+                id="goalTargetAmount"
+                name="target_amount"
+                required
+                min="0"
+                step="0.01"
+                placeholder="Enter target amount"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="goalDeadline">Deadline *</label>
+              <input type="date" id="goalDeadline" name="deadline" required />
+            </div>
+
+            <div class="form-group">
+              <label for="goalCategory">Category *</label>
+              <select id="goalCategory" name="category" required>
+                <option value="">Select a category</option>
+                <option value="emergency">Emergency Fund</option>
+                <option value="vacation">Vacation</option>
+                <option value="education">Education</option>
+                <option value="house">House</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="wedding">Wedding</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="goalStatus">Status</label>
+              <select id="goalStatus" name="status">
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="goalCurrentAmount">Current Amount (KES)</label>
+              <input
+                type="number"
+                id="goalCurrentAmount"
+                name="current_amount"
+                min="0"
+                step="0.01"
+                value="0"
+                readonly
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="goalProgress">Progress</label>
+              <div class="progress-container">
+                <div id="goalProgressBar" class="progress-bar">
+                  <div id="goalProgressFill" class="progress-fill"></div>
+                </div>
+                <span id="goalProgressText">0%</span>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save Goal</button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="closeGoalModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Goal Modal Functions
+      function openGoalModal() {
+        const modal = document.getElementById("goalModal");
+        modal.style.display = "block";
+        // Set minimum date to today for deadline
+        const today = new Date().toISOString().split("T")[0];
+        document.getElementById("goalDeadline").min = today;
+      }
+
+      function closeGoalModal() {
+        const modal = document.getElementById("goalModal");
+        modal.style.display = "none";
+        document.getElementById("goalForm").reset();
+      }
+
+      // Update the click outside handler
+      document.addEventListener("click", function (event) {
+        const modal = document.getElementById("goalModal");
+        if (event.target === modal) {
+          closeGoalModal();
+        }
+      });
+
+      // Add close button functionality
+      document
+        .querySelector("#goalModal .close")
+        .addEventListener("click", closeGoalModal);
+
+      // Handle goal form submission
+      document
+        .getElementById("goalForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const formData = {
+            name: document.getElementById("goalName").value,
+            target_amount: parseFloat(
+              document.getElementById("goalTargetAmount").value
+            ),
+            deadline: document.getElementById("goalDeadline").value,
+            category: document.getElementById("goalCategory").value,
+            status: document.getElementById("goalStatus").value,
+          };
+
+          try {
+            const response = await fetch("/api/saving-goals", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+              body: JSON.stringify(formData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.message || "Failed to create saving goal");
+            }
+
+            // Show success message
+            showNotification("Saving goal created successfully!", "success");
+
+            // Close modal and reset form
+            closeGoalModal();
+
+            // Refresh goals list if you have one
+            loadGoals(); // Make sure this function exists to refresh the goals list
+          } catch (error) {
+            showNotification(error.message, "error");
+            console.error("Error creating saving goal:", error);
+          }
+        });
+
+      // Update progress bar when target or current amount changes
+      function updateProgress() {
+        const targetAmount =
+          parseFloat(document.getElementById("goalTargetAmount").value) || 0;
+        const currentAmount =
+          parseFloat(document.getElementById("goalCurrentAmount").value) || 0;
+
+        if (targetAmount > 0) {
+          const progress = (currentAmount / targetAmount) * 100;
+          document.getElementById("goalProgressFill").style.width = `${Math.min(
+            progress,
+            100
+          )}%`;
+          document.getElementById(
+            "goalProgressText"
+          ).textContent = `${Math.round(progress)}%`;
+        }
+      }
+
+      // Add event listeners for progress updates
+      document
+        .getElementById("goalTargetAmount")
+        .addEventListener("input", updateProgress);
+      document
+        .getElementById("goalCurrentAmount")
+        .addEventListener("input", updateProgress);
+
+      // Add this function to your existing script section
+      async function loadGoals() {
+        try {
+          const response = await fetch("/api/saving-goals", {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to fetch goals");
+          }
+
+          const goals = await response.json();
+          const goalsList = document.getElementById("goalsList");
+          const totalSavings = document.getElementById("totalSavings");
+          const activeGoalsCount = document.getElementById("activeGoalsCount");
+          const completedGoalsCount = document.getElementById(
+            "completedGoalsCount"
+          );
+
+          // Clear existing goals
+          goalsList.innerHTML = "";
+
+          // Calculate totals
+          let total = 0;
+          let active = 0;
+          let completed = 0;
+
+          // Display each goal
+          goals.forEach((goal) => {
+            const progress = (goal.current_amount / goal.target_amount) * 100;
+            const daysLeft = Math.ceil(
+              (new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24)
+            );
+
+            const goalElement = document.createElement("div");
+            goalElement.className = "goal-card";
+            goalElement.innerHTML = `
+              <div class="goal-header">
+                <h3>${goal.name}</h3>
+                <span class="goal-status ${goal.status}">${goal.status}</span>
+              </div>
+              <div class="goal-details">
+                <p><strong>Target:</strong> <span class="currency-symbol">KES</span> ${parseFloat(
+                  goal.target_amount
+                ).toFixed(2)}</p>
+                <p><strong>Current:</strong> <span class="currency-symbol">KES</span> ${parseFloat(
+                  goal.current_amount
+                ).toFixed(2)}</p>
+                <p><strong>Deadline:</strong> ${new Date(
+                  goal.deadline
+                ).toLocaleDateString()}</p>
+                <p><strong>Days Left:</strong> ${daysLeft}</p>
+              </div>
+              <div class="goal-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: ${Math.min(
+                    progress,
+                    100
+                  )}%"></div>
+                </div>
+                <span class="progress-text">${Math.round(progress)}%</span>
+              </div>
+              <div class="goal-actions">
+                <button class="btn btn-small" onclick="updateGoal(${goal.id})">
+                  <i class="fas fa-edit"></i> Update
+                </button>
+                <button class="btn btn-small btn-danger" onclick="deleteGoal(${
+                  goal.id
+                })">
+                  <i class="fas fa-trash"></i> Delete
+                </button>
+              </div>
+            `;
+            goalsList.appendChild(goalElement);
+
+            // Update counters
+            total += parseFloat(goal.current_amount);
+            if (goal.status === "active") active++;
+            if (goal.status === "completed") completed++;
+          });
+
+          // Update summary cards
+          totalSavings.textContent = total.toFixed(2);
+          activeGoalsCount.textContent = active;
+          completedGoalsCount.textContent = completed;
+        } catch (error) {
+          console.error("Error loading goals:", error);
+          showNotification("Failed to load goals", "error");
+        }
+      }
+
+      // Add these helper functions for goal management
+      async function updateGoal(goalId) {
+        // Implement update functionality
+        showNotification("Update functionality coming soon", "info");
+      }
+
+      async function deleteGoal(goalId) {
+        if (!confirm("Are you sure you want to delete this goal?")) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/saving-goals/${goalId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to delete goal");
+          }
+
+          showNotification("Goal deleted successfully", "success");
+          loadGoals(); // Refresh the goals list
+        } catch (error) {
+          console.error("Error deleting goal:", error);
+          showNotification("Failed to delete goal", "error");
+        }
+      }
+
+      // Add this CSS for the goals list
+      const style = document.createElement("style");
+      style.textContent = `
+        .goals-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 20px;
+          padding: 20px;
+        }
+
+        .goal-card {
+          background: white;
+          border-radius: 8px;
+          padding: 20px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .goal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 15px;
+        }
+
+        .goal-status {
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          text-transform: capitalize;
+        }
+
+        .goal-status.active {
+          background: #e3f2fd;
+          color: #1976d2;
+        }
+
+        .goal-status.completed {
+          background: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        .goal-status.cancelled {
+          background: #ffebee;
+          color: #c62828;
+        }
+
+        .goal-details {
+          margin-bottom: 15px;
+        }
+
+        .goal-details p {
+          margin: 5px 0;
+        }
+
+        .goal-progress {
+          margin-bottom: 15px;
+        }
+
+        .progress-bar {
+          height: 8px;
+          background: #f0f0f0;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: #4CAF50;
+          transition: width 0.3s ease;
+        }
+
+        .progress-text {
+          display: block;
+          text-align: right;
+          font-size: 12px;
+          color: #666;
+        }
+
+        .goal-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+
+        .btn-small {
+          padding: 4px 8px;
+          font-size: 12px;
+        }
+
+        .btn-danger {
+          background: #f44336;
+          color: white;
+        }
+
+        .btn-danger:hover {
+          background: #d32f2f;
+        }
+      `;
+      document.head.appendChild(style);
+
+      // Add this CSS to ensure modal displays correctly
+      const modalStyle = document.createElement("style");
+      modalStyle.textContent = `
+        .modal {
+          display: none;
+          position: fixed;
+          z-index: 1000;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+          background-color: #fefefe;
+          margin: 5% auto;
+          padding: 20px;
+          border-radius: 8px;
+          width: 80%;
+          max-width: 600px;
+          position: relative;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          padding-bottom: 10px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h2 {
+          margin: 0;
+          color: #333;
+          font-size: 1.5rem;
+        }
+
+        .close {
+          color: #aaa;
+          font-size: 28px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: color 0.3s;
+        }
+
+        .close:hover {
+          color: #333;
+        }
+
+        .modal-body {
+          padding: 20px 0;
+        }
+
+        .form-group {
+          margin-bottom: 20px;
+        }
+
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          color: #555;
+          font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 14px;
+          transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+          border-color: #4CAF50;
+          outline: none;
+        }
+
+        .form-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
+          margin-top: 20px;
+        }
+
+        .btn {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: background-color 0.3s;
+        }
+
+        .btn-primary {
+          background-color: #4CAF50;
+          color: white;
+        }
+
+        .btn-primary:hover {
+          background-color: #45a049;
+        }
+
+        .btn-secondary {
+          background-color: #f44336;
+          color: white;
+        }
+
+        .btn-secondary:hover {
+          background-color: #da190b;
+        }
+      `;
+      document.head.appendChild(modalStyle);
+    </script>
   </body>
 </html>
