@@ -2,7 +2,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mysql = require("mysql2");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const PDFDocument = require("pdfkit");
 const XLSX = require("xlsx");
@@ -16,6 +16,10 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  port: process.env.PORT_DB || 3306,
+  ssl: {
+    rejectUnauthorized: false
+  },
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -76,6 +80,10 @@ function createConnection() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    port: process.env.PORT_DB || 3306,
+    ssl: {
+      rejectUnauthorized: false
+    }
   });
 }
 
@@ -1908,280 +1916,6 @@ app.post("/api/saving-goals", authenticateJWT, (req, res) => {
         connection.end();
       }
     );
-  });
-});
-
-app.get("/api/saving-goals", authenticateJWT, (req, res) => {
-  const userId = req.user.userId;
-  const connection = createConnection();
-
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query =
-      "SELECT * FROM saving_goals WHERE user_id = ? ORDER BY created_at DESC";
-    connection.query(query, [userId], (err, goals) => {
-      if (err) {
-        console.error("Error fetching saving goals:", err);
-        connection.end();
-        return res.status(500).json({ error: "Failed to fetch saving goals" });
-      }
-
-      res.json(goals);
-      connection.end();
-    });
-  });
-});
-
-app.put("/api/saving-goals/:id", authenticateJWT, (req, res) => {
-  const goalId = req.params.id;
-  const userId = req.user.userId;
-  const { name, target_amount, deadline, category, current_amount, status } =
-    req.body;
-  const ip = req.ip || req.connection.remoteAddress;
-
-  const connection = createConnection();
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query = `
-      UPDATE saving_goals 
-      SET name = ?, target_amount = ?, deadline = ?, category = ?, current_amount = ?, status = ?
-      WHERE id = ? AND user_id = ?
-    `;
-
-    connection.query(
-      query,
-      [
-        name,
-        target_amount,
-        deadline,
-        category,
-        current_amount,
-        status,
-        goalId,
-        userId,
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Error updating saving goal:", err);
-          connection.end();
-          return res
-            .status(500)
-            .json({ error: "Failed to update saving goal" });
-        }
-
-        if (result.affectedRows === 0) {
-          connection.end();
-          return res.status(404).json({ message: "Saving goal not found" });
-        }
-
-        logUserActivity(
-          userId,
-          "SAVING_GOAL_UPDATED",
-          `Updated saving goal: ${name}`,
-          ip
-        );
-
-        res.json({ message: "Saving goal updated successfully" });
-        connection.end();
-      }
-    );
-  });
-});
-
-app.delete("/api/saving-goals/:id", authenticateJWT, (req, res) => {
-  const goalId = req.params.id;
-  const userId = req.user.userId;
-  const ip = req.ip || req.connection.remoteAddress;
-
-  const connection = createConnection();
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query = "DELETE FROM saving_goals WHERE id = ? AND user_id = ?";
-    connection.query(query, [goalId, userId], (err, result) => {
-      if (err) {
-        console.error("Error deleting saving goal:", err);
-        connection.end();
-        return res.status(500).json({ error: "Failed to delete saving goal" });
-      }
-
-      if (result.affectedRows === 0) {
-        connection.end();
-        return res.status(404).json({ message: "Saving goal not found" });
-      }
-
-      logUserActivity(
-        userId,
-        "SAVING_GOAL_DELETED",
-        `Deleted saving goal ID: ${goalId}`,
-        ip
-      );
-
-      res.json({ message: "Saving goal deleted successfully" });
-      connection.end();
-    });
-  });
-});
-
-// ====================================
-// REMINDERS ROUTES & FUNCTIONS
-// ====================================
-
-app.post("/api/reminders", authenticateJWT, (req, res) => {
-  const { title, description, due_date, priority, type } = req.body;
-  const userId = req.user.userId;
-  const ip = req.ip || req.connection.remoteAddress;
-
-  if (!title || !due_date || !priority || !type) {
-    return res.status(400).json({ message: "Required fields are missing" });
-  }
-
-  const connection = createConnection();
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query = `
-      INSERT INTO reminders (user_id, title, description, due_date, priority, type, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'pending')
-    `;
-
-    connection.query(
-      query,
-      [userId, title, description, due_date, priority, type],
-      (err, result) => {
-        if (err) {
-          console.error("Error creating reminder:", err);
-          connection.end();
-          return res.status(500).json({ error: "Failed to create reminder" });
-        }
-
-        logUserActivity(
-          userId,
-          "REMINDER_CREATED",
-          `Created reminder: ${title}`,
-          ip
-        );
-
-        res.json({
-          message: "Reminder created successfully",
-          id: result.insertId,
-        });
-        connection.end();
-      }
-    );
-  });
-});
-
-app.get("/api/reminders", authenticateJWT, (req, res) => {
-  const userId = req.user.userId;
-  const connection = createConnection();
-
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query =
-      "SELECT * FROM reminders WHERE user_id = ? ORDER BY due_date ASC";
-    connection.query(query, [userId], (err, reminders) => {
-      if (err) {
-        console.error("Error fetching reminders:", err);
-        connection.end();
-        return res.status(500).json({ error: "Failed to fetch reminders" });
-      }
-
-      res.json(reminders);
-      connection.end();
-    });
-  });
-});
-
-app.put("/api/reminders/:id", authenticateJWT, (req, res) => {
-  const reminderId = req.params.id;
-  const userId = req.user.userId;
-  const { title, description, due_date, priority, type, status } = req.body;
-  const ip = req.ip || req.connection.remoteAddress;
-
-  const connection = createConnection();
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query = `
-      UPDATE reminders 
-      SET title = ?, description = ?, due_date = ?, priority = ?, type = ?, status = ?
-      WHERE id = ? AND user_id = ?
-    `;
-
-    connection.query(
-      query,
-      [
-        title,
-        description,
-        due_date,
-        priority,
-        type,
-        status,
-        reminderId,
-        userId,
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Error updating reminder:", err);
-          connection.end();
-          return res.status(500).json({ error: "Failed to update reminder" });
-        }
-
-        if (result.affectedRows === 0) {
-          connection.end();
-          return res.status(404).json({ message: "Reminder not found" });
-        }
-
-        logUserActivity(
-          userId,
-          "REMINDER_UPDATED",
-          `Updated reminder: ${title}`,
-          ip
-        );
-
-        res.json({ message: "Reminder updated successfully" });
-        connection.end();
-      }
-    );
-  });
-});
-
-app.delete("/api/reminders/:id", authenticateJWT, (req, res) => {
-  const reminderId = req.params.id;
-  const userId = req.user.userId;
-  const ip = req.ip || req.connection.remoteAddress;
-
-  const connection = createConnection();
-  connection.connect((err) => {
-    if (err) return handleError(res, "Database connection error", err);
-
-    const query = "DELETE FROM reminders WHERE id = ? AND user_id = ?";
-    connection.query(query, [reminderId, userId], (err, result) => {
-      if (err) {
-        console.error("Error deleting reminder:", err);
-        connection.end();
-        return res.status(500).json({ error: "Failed to delete reminder" });
-      }
-
-      if (result.affectedRows === 0) {
-        connection.end();
-        return res.status(404).json({ message: "Reminder not found" });
-      }
-
-      logUserActivity(
-        userId,
-        "REMINDER_DELETED",
-        `Deleted reminder ID: ${reminderId}`,
-        ip
-      );
-
-      res.json({ message: "Reminder deleted successfully" });
-      connection.end();
-    });
   });
 });
 
